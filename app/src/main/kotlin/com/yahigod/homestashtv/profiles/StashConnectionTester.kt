@@ -3,6 +3,7 @@ package com.yahigod.homestashtv.profiles
 import com.yahigod.homestashtv.playback.stashAuthorizationHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.NoRouteToHostException
@@ -64,9 +65,15 @@ class StashConnectionTester {
                 connection.setRequestProperty(name, value)
             }
             connection.outputStream.bufferedWriter().use {
-                it.write("""{"query":"query { __typename }"}""")
+                it.write("""{"query":"query { version { version } }"}""")
             }
-            classifyHttpResponse(connection.responseCode)
+            when (val httpResult = classifyHttpResponse(connection.responseCode)) {
+                is ConnectionTestResult.Failure -> httpResult
+                ConnectionTestResult.Success -> {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    classifyGraphQlResponse(response)
+                }
+            }
         } catch (error: Exception) {
             classifyConnectionFailure(error)
         } finally {
@@ -93,6 +100,39 @@ internal fun classifyHttpResponse(responseCode: Int): ConnectionTestResult =
         -> failureFor(ConnectionFailureKind.AUTHENTICATION)
         else -> failureFor(ConnectionFailureKind.SERVER, responseCode)
     }
+
+internal fun classifyGraphQlResponse(response: String): ConnectionTestResult {
+    val root = runCatching { JSONObject(response) }.getOrNull()
+        ?: return failureFor(ConnectionFailureKind.SERVER)
+
+    val errors = root.optJSONArray("errors")
+    if (errors != null && errors.length() > 0) {
+        val authenticationFailure = (0 until errors.length()).any { index ->
+            val message = errors.optJSONObject(index)
+                ?.optString("message")
+                ?.lowercase()
+                .orEmpty()
+            AUTHENTICATION_ERROR_TERMS.any { term -> message.contains(term) }
+        }
+        return failureFor(
+            if (authenticationFailure) {
+                ConnectionFailureKind.AUTHENTICATION
+            } else {
+                ConnectionFailureKind.SERVER
+            },
+        )
+    }
+
+    val version = root.optJSONObject("data")
+        ?.optJSONObject("version")
+        ?.optString("version")
+        ?.takeIf { it.isNotBlank() }
+    return if (version != null) {
+        ConnectionTestResult.Success
+    } else {
+        failureFor(ConnectionFailureKind.SERVER)
+    }
+}
 
 internal fun classifyConnectionFailure(error: Throwable): ConnectionTestResult {
     val causes = generateSequence(error as Throwable?) { it.cause }.toList()
@@ -126,10 +166,21 @@ private fun failureFor(
         ConnectionFailureKind.AUTHENTICATION ->
             "Stash rejected the API key. Check or replace the key."
         ConnectionFailureKind.SERVER ->
-            "Stash returned HTTP ${responseCode ?: "error"}. Check the server and GraphQL endpoint."
+            if (responseCode != null) {
+                "Stash returned HTTP $responseCode. Check the server and GraphQL endpoint."
+            } else {
+                "The server did not return a compatible Stash GraphQL response."
+            }
     }
     return ConnectionTestResult.Failure(kind, message)
 }
+
+private val AUTHENTICATION_ERROR_TERMS = listOf(
+    "unauthorized",
+    "forbidden",
+    "access denied",
+    "authentication",
+)
 
 private const val CONNECT_TIMEOUT_MS = 10_000
 private const val READ_TIMEOUT_MS = 15_000
