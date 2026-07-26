@@ -114,7 +114,7 @@ class StashSceneResolver {
 }
 
 internal fun stashAuthorizationHeaders(apiKey: String): Map<String, String> =
-    mapOf("Authorization" to "Bearer $apiKey")
+    mapOf("ApiKey" to apiKey)
 
 internal fun parseSceneResponse(
     response: String,
