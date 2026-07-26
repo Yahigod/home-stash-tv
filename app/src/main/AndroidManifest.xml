@@ -35,6 +35,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".playback.PlaybackActivity"
+            android:exported="false" />
+
         <service
             android:name=".playback.PlaybackService"
             android:exported="false"

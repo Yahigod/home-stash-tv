@@ -29,7 +29,7 @@ Deliverables:
 - Temporary developer configuration for one test Stash server
 - Resolve one known scene through the Stash API
 - Media3 playback with play/pause, seek, back, and error display
-- Initial codec, audio, and subtitle compatibility notes
+- Initial codec and audio compatibility notes
 
 Exit criteria:
 
@@ -84,7 +84,7 @@ Deliverables:
 - Media3 playlist construction
 - Start-at-scene support
 - Continue, loop, and reshuffle policy
-- Subtitle/audio selection and D-pad player UI
+- Audio selection and D-pad player UI
 - Queue persistence sufficient for crash recovery
 - Playback-state reporting
 
@@ -138,6 +138,7 @@ Exit criteria:
 
 After the receiver MVP is stable, the same app may add:
 
+- Subtitle discovery, selection, and translated-subtitle workflows
 - TV-native scene browsing
 - Search and saved filters
 - Performers and groups
