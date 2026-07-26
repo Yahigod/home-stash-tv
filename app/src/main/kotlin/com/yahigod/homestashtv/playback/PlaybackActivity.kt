@@ -200,6 +200,7 @@ private fun SingleScenePlaybackScreen(
     }
 
     val error = resolutionError ?: controllerError ?: playbackError
+    val activeController = controller
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -214,7 +215,7 @@ private fun SingleScenePlaybackScreen(
                 )
             },
     ) {
-        if (controller != null && error == null) {
+        if (activeController != null && error == null) {
             AndroidView(
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
@@ -225,29 +226,29 @@ private fun SingleScenePlaybackScreen(
                     }
                 },
                 update = { playerView ->
-                    if (playerView.player !== controller) {
-                        playerView.player = controller
+                    if (playerView.player !== activeController) {
+                        playerView.player = activeController
 
                         if (
                             reconnectOnly &&
                             shouldPrimePausedVideoFrame(
-                                hasMediaItem = controller.currentMediaItem != null,
-                                playbackState = controller.playbackState,
-                                playWhenReady = controller.playWhenReady,
+                                hasMediaItem = activeController.currentMediaItem != null,
+                                playbackState = activeController.playbackState,
+                                playWhenReady = activeController.playWhenReady,
                             )
                         ) {
                             playerView.postOnAnimation {
                                 if (
-                                    playerView.player === controller &&
+                                    playerView.player === activeController &&
                                     shouldPrimePausedVideoFrame(
-                                        hasMediaItem = controller.currentMediaItem != null,
-                                        playbackState = controller.playbackState,
-                                        playWhenReady = controller.playWhenReady,
+                                        hasMediaItem = activeController.currentMediaItem != null,
+                                        playbackState = activeController.playbackState,
+                                        playWhenReady = activeController.playWhenReady,
                                     )
                                 ) {
-                                    controller.seekTo(
-                                        controller.currentMediaItemIndex,
-                                        controller.currentPosition,
+                                    activeController.seekTo(
+                                        activeController.currentMediaItemIndex,
+                                        activeController.currentPosition,
                                     )
                                 }
                             }
