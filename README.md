@@ -13,7 +13,7 @@ The first usable version will:
 - receive a scene or ordered queue from the Home Stash integration;
 - resolve authenticated media from one or more configured Stash servers;
 - play through Android Media3/ExoPlayer;
-- support D-pad playback controls, subtitles, queue continuation, looping, and reshuffling;
+- support D-pad playback controls, queue continuation, looping, and reshuffling;
 - report connection, playback, and failure state to the bridge;
 - allow the existing bridge to handle Wake-on-LAN and application launching.
 

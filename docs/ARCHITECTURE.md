@@ -25,7 +25,7 @@ An outbound connection from the app avoids exposing a listener on the television
 - Pair with a bridge and maintain the receiver connection.
 - Validate and acknowledge versioned commands.
 - Resolve scene metadata and playable sources from Stash.
-- Own the Media3 player, queue, subtitles, audio selection, and D-pad controls.
+- Own the Media3 player, queue, audio selection, and D-pad controls.
 - Report coarse playback state and actionable errors.
 
 ### Home-server bridge
@@ -108,7 +108,7 @@ This repository contains the Android application, protocol specification, tests,
 ## Open decisions for the first spikes
 
 - Compose for TV compatibility on the device
-- Supported video/audio/subtitle matrix
+- Supported video/audio matrix
 - Exact Stash stream-resolution API calls
 - WebSocket library and reconnection policy
 - Whether bridge discovery uses manual address entry, mDNS, or both
