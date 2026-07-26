@@ -48,7 +48,9 @@ These are future-client concerns and must not block the receiver.
 - Gradle version catalog
 - GitHub Actions for build and tests
 
-The minimum Android API level will be selected after the first device-compatibility spike against the target Tesla TV.
+The receiver uses `minSdk 26`. The first target Tesla TV was verified as
+Android 14 / API 34 with an ARMv7 ABI and the standard Android TV feature
+flags. See [the compatibility notes](docs/DEVICE_COMPATIBILITY.md).
 
 ## Delivery checkpoints
 

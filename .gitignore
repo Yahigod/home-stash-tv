@@ -1,0 +1,19 @@
+*.iml
+.gradle/
+.idea/
+.kotlin/
+build/
+**/build/
+captures/
+local.properties
+.DS_Store
+
+# Signing and secret-bearing files
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+secrets.properties
+.env
+.env.*

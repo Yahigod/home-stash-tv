@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="receiver_background">#07121D</color>
+    <color name="receiver_accent">#64C7FF</color>
+</resources>
