@@ -37,7 +37,9 @@ class StashSceneResolver {
             connection.readTimeout = READ_TIMEOUT_MS
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty(STASH_API_KEY_HEADER, apiKey)
+            stashAuthorizationHeaders(apiKey).forEach { (name, value) ->
+                connection.setRequestProperty(name, value)
+            }
             connection.outputStream.bufferedWriter().use { it.write(requestBody) }
 
             when (connection.responseCode) {
@@ -96,7 +98,6 @@ class StashSceneResolver {
     companion object {
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 15_000
-        private const val STASH_API_KEY_HEADER = "ApiKey"
 
         private val FIND_SCENE_QUERY = """
             query FindScene(${'$'}id: ID!) {
@@ -111,6 +112,9 @@ class StashSceneResolver {
         """.trimIndent()
     }
 }
+
+internal fun stashAuthorizationHeaders(apiKey: String): Map<String, String> =
+    mapOf("Authorization" to "Bearer $apiKey")
 
 internal fun parseSceneResponse(
     response: String,

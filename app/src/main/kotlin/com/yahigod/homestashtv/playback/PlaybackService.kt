@@ -60,7 +60,7 @@ class PlaybackService : MediaSessionService() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(mapOf(STASH_API_KEY_HEADER to apiKey))
+            .setDefaultRequestProperties(stashAuthorizationHeaders(apiKey))
             .setUserAgent(USER_AGENT)
         val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
@@ -87,7 +87,6 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_API_KEY = "api_key"
         const val EXTRA_TITLE = "title"
 
-        private const val STASH_API_KEY_HEADER = "ApiKey"
         private const val USER_AGENT = "HomeStashTV/0.1"
     }
 }

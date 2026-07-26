@@ -7,6 +7,14 @@ import org.junit.Test
 
 class StashSceneResolverTest {
     @Test
+    fun `stash authentication uses bearer token`() {
+        assertEquals(
+            mapOf("Authorization" to "Bearer test-api-key"),
+            stashAuthorizationHeaders("test-api-key"),
+        )
+    }
+
+    @Test
     fun `scene response resolves title and removes embedded api key`() {
         val response = """
             {
