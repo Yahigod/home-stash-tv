@@ -46,7 +46,7 @@ class StashSceneResolver {
                 HttpURLConnection.HTTP_UNAUTHORIZED,
                 HttpURLConnection.HTTP_FORBIDDEN,
                 -> throw SceneResolutionException(
-                    "Stash rejected the API key. Check the temporary test credentials.",
+                    "Stash rejected the API key. Check the configured server profile.",
                 )
 
                 HttpURLConnection.HTTP_NOT_FOUND -> throw SceneResolutionException(
@@ -90,7 +90,7 @@ class StashSceneResolver {
     ) {
         if (serverUrl.isBlank() || apiKey.isBlank() || sceneId.isBlank()) {
             throw SceneResolutionException(
-                "The temporary server address, API key, and scene ID are required.",
+                "The server address, API key, and scene ID are required.",
             )
         }
     }
