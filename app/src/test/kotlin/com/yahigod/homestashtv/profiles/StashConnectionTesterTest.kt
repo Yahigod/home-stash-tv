@@ -36,6 +36,33 @@ class StashConnectionTesterTest {
     }
 
     @Test
+    fun `accepts a compatible Stash version response`() {
+        assertEquals(
+            ConnectionTestResult.Success,
+            classifyGraphQlResponse(
+                """{"data":{"version":{"version":"v0.31.1"}}}""",
+            ),
+        )
+    }
+
+    @Test
+    fun `classifies GraphQL authentication errors`() {
+        val result = classifyGraphQlResponse(
+            """{"errors":[{"message":"unauthorized"}]}""",
+        ) as ConnectionTestResult.Failure
+
+        assertEquals(ConnectionFailureKind.AUTHENTICATION, result.kind)
+    }
+
+    @Test
+    fun `rejects non Stash success responses`() {
+        val result = classifyGraphQlResponse("""{"data":{"__typename":"Query"}}""")
+            as ConnectionTestResult.Failure
+
+        assertEquals(ConnectionFailureKind.SERVER, result.kind)
+    }
+
+    @Test
     fun `distinguishes DNS network and TLS failures`() {
         assertEquals(
             ConnectionFailureKind.DNS,
