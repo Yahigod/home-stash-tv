@@ -1,5 +1,7 @@
 package com.yahigod.homestashtv
 
+import android.content.ComponentName
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -35,10 +37,18 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
+import androidx.core.content.ContextCompat
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.tv.material3.Text
+import com.google.common.util.concurrent.ListenableFuture
+import com.yahigod.homestashtv.playback.PlaybackActivity
+import com.yahigod.homestashtv.playback.PlaybackService
 import com.yahigod.homestashtv.ui.theme.HomeStashTvTheme
 
 class MainActivity : ComponentActivity() {
+    private var playbackProbe: ListenableFuture<MediaController>? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -48,6 +58,51 @@ class MainActivity : ComponentActivity() {
                 ReceiverHomeScreen(onExit = ::exitApp)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        probeForActivePlayback()
+    }
+
+    override fun onStop() {
+        playbackProbe?.let { MediaController.releaseFuture(it) }
+        playbackProbe = null
+        super.onStop()
+    }
+
+    private fun probeForActivePlayback() {
+        if (playbackProbe != null) {
+            return
+        }
+
+        val sessionToken = SessionToken(
+            this,
+            ComponentName(this, PlaybackService::class.java),
+        )
+        val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+        playbackProbe = controllerFuture
+        controllerFuture.addListener(
+            {
+                if (playbackProbe === controllerFuture) {
+                    val hasActiveScene = runCatching {
+                        controllerFuture.get().currentMediaItem != null
+                    }.getOrDefault(false)
+
+                    playbackProbe = null
+                    MediaController.releaseFuture(controllerFuture)
+
+                    if (hasActiveScene && !isFinishing && !isDestroyed) {
+                        startActivity(
+                            Intent(this, PlaybackActivity::class.java).apply {
+                                action = PlaybackActivity.ACTION_RECONNECT
+                            },
+                        )
+                    }
+                }
+            },
+            ContextCompat.getMainExecutor(this),
+        )
     }
 
     private fun exitApp() {
