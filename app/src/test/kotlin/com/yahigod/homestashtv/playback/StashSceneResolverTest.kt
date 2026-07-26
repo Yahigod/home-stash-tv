@@ -7,9 +7,9 @@ import org.junit.Test
 
 class StashSceneResolverTest {
     @Test
-    fun `stash authentication uses bearer token`() {
+    fun `stash authentication uses api key header`() {
         assertEquals(
-            mapOf("Authorization" to "Bearer test-api-key"),
+            mapOf("ApiKey" to "test-api-key"),
             stashAuthorizationHeaders("test-api-key"),
         )
     }
