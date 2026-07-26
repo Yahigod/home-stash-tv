@@ -54,6 +54,7 @@ class PlaybackActivity : ComponentActivity() {
         val serverUrl = intent.getStringExtra(PlaybackContract.EXTRA_SERVER_URL).orEmpty()
         val apiKey = intent.getStringExtra(PlaybackContract.EXTRA_API_KEY).orEmpty()
         val sceneId = intent.getStringExtra(PlaybackContract.EXTRA_SCENE_ID).orEmpty()
+        val reconnectOnly = intent.action == ACTION_RECONNECT
 
         setContent {
             HomeStashTvTheme {
@@ -62,6 +63,7 @@ class PlaybackActivity : ComponentActivity() {
                     serverUrl = serverUrl,
                     apiKey = apiKey,
                     sceneId = sceneId,
+                    reconnectOnly = reconnectOnly,
                     onExit = ::stopPlaybackAndFinish,
                 )
             }
@@ -76,6 +78,11 @@ class PlaybackActivity : ComponentActivity() {
         )
         finish()
     }
+
+    companion object {
+        const val ACTION_RECONNECT =
+            "com.yahigod.homestashtv.action.RECONNECT_PLAYBACK"
+    }
 }
 
 @Composable
@@ -83,11 +90,12 @@ private fun SingleScenePlaybackScreen(
     serverUrl: String,
     apiKey: String,
     sceneId: String,
+    reconnectOnly: Boolean,
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
-    var source by remember { mutableStateOf<ScenePlaybackSource?>(null) }
+    var title by remember { mutableStateOf<String?>(null) }
     var resolutionError by remember { mutableStateOf<String?>(null) }
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var controllerError by remember { mutableStateOf<String?>(null) }
@@ -110,6 +118,9 @@ private fun SingleScenePlaybackScreen(
                     .onSuccess {
                         if (!disposed) {
                             controller = it
+                            if (reconnectOnly && it.currentMediaItem == null) {
+                                controllerError = "No active scene is available to resume."
+                            }
                         }
                     }
                     .onFailure {
@@ -128,11 +139,15 @@ private fun SingleScenePlaybackScreen(
         }
     }
 
-    LaunchedEffect(serverUrl, apiKey, sceneId) {
+    LaunchedEffect(serverUrl, apiKey, sceneId, reconnectOnly) {
+        if (reconnectOnly) {
+            return@LaunchedEffect
+        }
+
         runCatching {
             StashSceneResolver().resolve(serverUrl, apiKey, sceneId)
         }.onSuccess { resolvedSource ->
-            source = resolvedSource
+            title = resolvedSource.title
             context.startService(
                 Intent(context, PlaybackService::class.java).apply {
                     action = PlaybackService.ACTION_LOAD_TEST_SCENE
@@ -171,6 +186,7 @@ private fun SingleScenePlaybackScreen(
     LaunchedEffect(controller) {
         while (true) {
             controller?.let {
+                title = it.currentMediaItem?.mediaMetadata?.title?.toString()
                 positionMs = it.currentPosition.coerceAtLeast(0L)
                 durationMs = it.duration.coerceAtLeast(0L)
                 isPlaying = it.isPlaying
@@ -213,7 +229,7 @@ private fun SingleScenePlaybackScreen(
         }
 
         PlaybackOverlay(
-            title = source?.title,
+            title = title,
             isPlaying = isPlaying,
             positionMs = positionMs,
             durationMs = durationMs,
