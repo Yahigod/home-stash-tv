@@ -221,9 +221,39 @@ private fun SingleScenePlaybackScreen(
                         useController = false
                         keepScreenOn = true
                         isFocusable = false
+                        setKeepContentOnPlayerReset(true)
                     }
                 },
-                update = { it.player = controller },
+                update = { playerView ->
+                    if (playerView.player !== controller) {
+                        playerView.player = controller
+
+                        if (
+                            reconnectOnly &&
+                            shouldPrimePausedVideoFrame(
+                                hasMediaItem = controller.currentMediaItem != null,
+                                playbackState = controller.playbackState,
+                                playWhenReady = controller.playWhenReady,
+                            )
+                        ) {
+                            playerView.postOnAnimation {
+                                if (
+                                    playerView.player === controller &&
+                                    shouldPrimePausedVideoFrame(
+                                        hasMediaItem = controller.currentMediaItem != null,
+                                        playbackState = controller.playbackState,
+                                        playWhenReady = controller.playWhenReady,
+                                    )
+                                ) {
+                                    controller.seekTo(
+                                        controller.currentMediaItemIndex,
+                                        controller.currentPosition,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -391,6 +421,15 @@ private fun actionablePlaybackError(error: PlaybackException): String = when (er
 
     else -> "Media3 reported ${error.errorCodeName}. Try another scene or file format."
 }
+
+internal fun shouldPrimePausedVideoFrame(
+    hasMediaItem: Boolean,
+    playbackState: Int,
+    playWhenReady: Boolean,
+): Boolean =
+    hasMediaItem &&
+        playbackState == Player.STATE_READY &&
+        !playWhenReady
 
 private fun formatTime(milliseconds: Long): String {
     val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000
