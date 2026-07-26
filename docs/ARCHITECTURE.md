@@ -107,9 +107,19 @@ This repository contains the Android application, protocol specification, tests,
 
 ## Open decisions for the first spikes
 
-- Minimum supported Android API level for the Tesla TV
 - Compose for TV compatibility on the device
 - Supported video/audio/subtitle matrix
 - Exact Stash stream-resolution API calls
 - WebSocket library and reconnection policy
 - Whether bridge discovery uses manual address entry, mDNS, or both
+
+## Resolved foundation decisions
+
+- `minSdk 26`; the first Tesla target is Android 14 / API 34.
+- The application is TV-only and requires Leanback and television device
+  features while explicitly not requiring a touchscreen.
+- The first app process contains an empty Media3 session service, but playback
+  starts only after a later checkpoint supplies media.
+- Cleartext transport remains enabled because the receiver MVP must support
+  user-configured HTTP Stash servers on the local network. Credentials and
+  server addresses are never compiled into the APK.
