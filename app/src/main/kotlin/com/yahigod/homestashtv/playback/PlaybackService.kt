@@ -26,10 +26,7 @@ class PlaybackService : MediaSessionService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_LOAD_TEST_SCENE -> loadTestScene(intent)
-            ACTION_STOP_PLAYBACK -> {
-                player.stop()
-                stopSelf()
-            }
+            ACTION_STOP_PLAYBACK -> stopPlayback()
         }
 
         return super.onStartCommand(intent, flags, startId)
@@ -40,8 +37,7 @@ class PlaybackService : MediaSessionService() {
     ): MediaSession? = mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        mediaSession?.player?.stop()
-        stopSelf()
+        stopPlayback()
     }
 
     override fun onDestroy() {
@@ -52,6 +48,12 @@ class PlaybackService : MediaSessionService() {
         player.release()
 
         super.onDestroy()
+    }
+
+    private fun stopPlayback() {
+        player.stop()
+        player.clearMediaItems()
+        stopSelf()
     }
 
     private fun loadTestScene(intent: Intent) {
