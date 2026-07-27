@@ -279,7 +279,9 @@ private fun QueuePlaybackScreen(
                         putExtra(PlaybackService.EXTRA_START_INDEX, queue.startIndex)
                         putExtra(
                             PlaybackService.EXTRA_START_POSITION_MS,
-                            requestedStartPositionMs,
+                            requestedStartPositionMs.takeIf {
+                                queue.startPositionApplies
+                            } ?: 0L,
                         )
                         putExtra(PlaybackService.EXTRA_CONTINUE, continuePlayback)
                         putExtra(PlaybackService.EXTRA_LOOP, loop)
