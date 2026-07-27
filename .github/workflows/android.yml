@@ -37,7 +37,34 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Configure stable development signing
+        env:
+          HOME_STASH_TV_DEBUG_KEYSTORE_B64: ${{ secrets.HOME_STASH_TV_DEBUG_KEYSTORE_B64 }}
+          HOME_STASH_TV_KEYSTORE_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEYSTORE_PASSWORD }}
+          HOME_STASH_TV_KEY_ALIAS: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_ALIAS }}
+          HOME_STASH_TV_KEY_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_PASSWORD }}
+        run: |
+          for name in \
+            HOME_STASH_TV_DEBUG_KEYSTORE_B64 \
+            HOME_STASH_TV_KEYSTORE_PASSWORD \
+            HOME_STASH_TV_KEY_ALIAS \
+            HOME_STASH_TV_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::Stable development signing is not configured."
+              exit 1
+            fi
+          done
+          printf '%s' "$HOME_STASH_TV_DEBUG_KEYSTORE_B64" \
+            | base64 --decode > "$RUNNER_TEMP/home-stash-tv-debug.p12"
+          chmod 600 "$RUNNER_TEMP/home-stash-tv-debug.p12"
+
       - name: Verify
+        env:
+          HOME_STASH_TV_KEYSTORE_FILE: ${{ runner.temp }}/home-stash-tv-debug.p12
+          HOME_STASH_TV_KEYSTORE_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEYSTORE_PASSWORD }}
+          HOME_STASH_TV_KEY_ALIAS: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_ALIAS }}
+          HOME_STASH_TV_KEY_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_PASSWORD }}
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
 
       - name: Upload debug APK
