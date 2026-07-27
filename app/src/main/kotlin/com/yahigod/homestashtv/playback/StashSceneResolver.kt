@@ -23,7 +23,7 @@ class StashSceneResolver {
         apiKey: String,
         sceneId: String,
     ): ScenePlaybackSource = withContext(Dispatchers.IO) {
-        validateConfiguration(serverUrl, apiKey, sceneId)
+        validateConfiguration(serverUrl, sceneId)
 
         val connection = openGraphQlConnection(serverUrl)
         try {
@@ -85,7 +85,6 @@ class StashSceneResolver {
 
     private fun validateConfiguration(
         serverUrl: String,
-        apiKey: String,
         sceneId: String,
     ) {
         if (serverUrl.isBlank() || sceneId.isBlank()) {
