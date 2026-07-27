@@ -56,21 +56,17 @@ class ServerProfileRepositoryTest {
     }
 
     @Test
-    fun `new profile cannot be saved without a credential`() {
+    fun `new profile supports anonymous access without a credential`() {
         val repository = StoredServerProfileRepository(
             FakeMetadataStore(),
             FakeCredentialStore(),
         )
+        val profile = ServerProfile("id", "Stash", "http://stash.test")
 
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            repository.saveProfile(
-                ServerProfile("id", "Stash", "http://stash.test"),
-                null,
-            )
-        }
+        repository.saveProfile(profile, null)
 
-        assertTrue(error.message.orEmpty().contains("API key"))
-        assertTrue(repository.listProfiles().isEmpty())
+        assertEquals(listOf(profile), repository.listProfiles())
+        assertNull(repository.getCredential(profile.id))
     }
 
     @Test
