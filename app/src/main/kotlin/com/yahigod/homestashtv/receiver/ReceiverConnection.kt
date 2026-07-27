@@ -129,6 +129,9 @@ internal class ReceiverConnection(
         connect()
     }
 
+    fun reportPlayback(state: PlaybackStateReport): Boolean =
+        socket?.send(encodePlaybackState(state)) == true
+
     private fun connect() {
         if (!running.get() || socket != null) {
             return
@@ -254,22 +257,25 @@ internal class ReceiverConnection(
 
 class AndroidReceiverCommandExecutor(
     private val context: Context,
-    private val profiles: ServerProfileRepository,
 ) : ReceiverCommandExecutor {
     override fun execute(command: PlayQueueCommand) {
-        val profile = profiles.listProfiles().single { it.id == command.profileId }
         context.startActivity(
             Intent(context, PlaybackActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                putExtra(PlaybackContract.EXTRA_SERVER_URL, profile.serverUrl)
                 putExtra(
-                    PlaybackContract.EXTRA_API_KEY,
-                    profiles.getCredential(profile.id).orEmpty(),
+                    PlaybackContract.EXTRA_COMMAND_ID,
+                    command.id,
                 )
-                putExtra(
-                    PlaybackContract.EXTRA_SCENE_ID,
-                    command.sceneIds[command.startIndex],
+                putExtra(PlaybackContract.EXTRA_PROFILE_ID, command.profileId)
+                putStringArrayListExtra(
+                    PlaybackContract.EXTRA_SCENE_IDS,
+                    ArrayList(command.sceneIds),
                 )
+                putExtra(PlaybackContract.EXTRA_START_INDEX, command.startIndex)
+                putExtra(PlaybackContract.EXTRA_START_POSITION_MS, command.startPositionMs)
+                putExtra(PlaybackContract.EXTRA_CONTINUE, command.continuePlayback)
+                putExtra(PlaybackContract.EXTRA_LOOP, command.loop)
+                putExtra(PlaybackContract.EXTRA_RESHUFFLE, command.reshuffle)
             },
         )
     }
@@ -286,10 +292,15 @@ internal object ReceiverRuntime {
                 pairingRepository = AndroidBridgePairingRepository(appContext),
                 profileRepository = profiles,
                 commandLedger = AndroidCommandLedger(appContext),
-                commandExecutor = AndroidReceiverCommandExecutor(appContext, profiles),
+                commandExecutor = AndroidReceiverCommandExecutor(appContext),
             ).also { connection = it }
         }
     }
+
+    fun reportPlayback(
+        context: Context,
+        state: PlaybackStateReport,
+    ): Boolean = get(context).reportPlayback(state)
 }
 
 private const val REVOKED_CLOSE_CODE = 4003
