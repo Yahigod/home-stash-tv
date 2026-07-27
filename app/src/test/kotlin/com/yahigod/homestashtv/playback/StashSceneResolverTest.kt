@@ -15,6 +15,12 @@ class StashSceneResolverTest {
     }
 
     @Test
+    fun `anonymous Stash omits authentication header`() {
+        assertTrue(stashAuthorizationHeaders(null).isEmpty())
+        assertTrue(stashAuthorizationHeaders("").isEmpty())
+    }
+
+    @Test
     fun `scene response resolves title and removes embedded api key`() {
         val response = """
             {
