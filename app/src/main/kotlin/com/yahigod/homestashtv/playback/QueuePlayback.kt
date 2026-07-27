@@ -8,6 +8,7 @@ data class SkippedScene(
 data class ResolvedPlaybackQueue(
     val sources: List<ScenePlaybackSource>,
     val startIndex: Int,
+    val startPositionApplies: Boolean,
     val skippedScenes: List<SkippedScene>,
 )
 
