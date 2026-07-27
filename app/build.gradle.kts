@@ -3,6 +3,22 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val developmentKeystoreFile = providers.environmentVariable("HOME_STASH_TV_KEYSTORE_FILE").orNull
+val developmentKeystorePassword =
+    providers.environmentVariable("HOME_STASH_TV_KEYSTORE_PASSWORD").orNull
+val developmentKeyAlias = providers.environmentVariable("HOME_STASH_TV_KEY_ALIAS").orNull
+val developmentKeyPassword = providers.environmentVariable("HOME_STASH_TV_KEY_PASSWORD").orNull
+val developmentSigningValues = listOf(
+    developmentKeystoreFile,
+    developmentKeystorePassword,
+    developmentKeyAlias,
+    developmentKeyPassword,
+)
+val developmentSigningConfigured = developmentSigningValues.all { !it.isNullOrBlank() }
+if (developmentSigningValues.any { !it.isNullOrBlank() } && !developmentSigningConfigured) {
+    throw GradleException("Development signing configuration is incomplete.")
+}
+
 android {
     namespace = "com.yahigod.homestashtv"
     compileSdk = 36
@@ -17,10 +33,24 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (developmentSigningConfigured) {
+            create("development") {
+                storeFile = file(developmentKeystoreFile!!)
+                storePassword = developmentKeystorePassword!!
+                keyAlias = developmentKeyAlias!!
+                keyPassword = developmentKeyPassword!!
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            if (developmentSigningConfigured) {
+                signingConfig = signingConfigs.getByName("development")
+            }
         }
 
         release {
