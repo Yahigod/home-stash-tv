@@ -44,6 +44,7 @@ import androidx.tv.material3.Text
 import com.google.common.util.concurrent.ListenableFuture
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackService
+import com.yahigod.homestashtv.profiles.ProfileSettingsActivity
 import com.yahigod.homestashtv.ui.theme.HomeStashTvTheme
 
 class MainActivity : ComponentActivity() {
@@ -55,7 +56,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             HomeStashTvTheme {
                 BackHandler(onBack = ::exitApp)
-                ReceiverHomeScreen(onExit = ::exitApp)
+                ReceiverHomeScreen(
+                    onOpenProfiles = {
+                        startActivity(Intent(this, ProfileSettingsActivity::class.java))
+                    },
+                    onExit = ::exitApp,
+                )
             }
         }
     }
@@ -112,14 +118,16 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 internal fun ReceiverHomeScreen(
+    onOpenProfiles: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val exitFocusRequester = remember { FocusRequester() }
+    val profilesFocusRequester = remember { FocusRequester() }
+    var profilesHasFocus by remember { mutableStateOf(false) }
     var exitHasFocus by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        exitFocusRequester.requestFocus()
+        profilesFocusRequester.requestFocus()
     }
 
     Box(
@@ -162,9 +170,44 @@ internal fun ReceiverHomeScreen(
             )
             Spacer(modifier = Modifier.height(52.dp))
             Button(
+                onClick = onOpenProfiles,
+                modifier = Modifier
+                    .focusRequester(profilesFocusRequester)
+                    .onFocusChanged { profilesHasFocus = it.isFocused }
+                    .semantics {
+                        contentDescription =
+                            if (profilesHasFocus) {
+                                "Server profiles, focused"
+                            } else {
+                                "Server profiles"
+                            }
+                    },
+                colors = ButtonDefaults.colors(
+                    containerColor = Color(0xFF20384D),
+                    focusedContainerColor = Color(0xFFE9F7FF),
+                    contentColor = Color.White,
+                    focusedContentColor = Color(0xFF07121D),
+                ),
+                border = ButtonDefaults.border(
+                    focusedBorder = Border(
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 3.dp,
+                            color = Color(0xFF64C7FF),
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                ),
+            ) {
+                Text(
+                    text = "Server profiles",
+                    fontSize = 24.sp,
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
                 onClick = onExit,
                 modifier = Modifier
-                    .focusRequester(exitFocusRequester)
                     .onFocusChanged { exitHasFocus = it.isFocused }
                     .semantics {
                         contentDescription =

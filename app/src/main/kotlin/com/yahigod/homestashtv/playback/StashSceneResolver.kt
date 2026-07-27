@@ -23,7 +23,7 @@ class StashSceneResolver {
         apiKey: String,
         sceneId: String,
     ): ScenePlaybackSource = withContext(Dispatchers.IO) {
-        validateConfiguration(serverUrl, apiKey, sceneId)
+        validateConfiguration(serverUrl, sceneId)
 
         val connection = openGraphQlConnection(serverUrl)
         try {
@@ -46,7 +46,7 @@ class StashSceneResolver {
                 HttpURLConnection.HTTP_UNAUTHORIZED,
                 HttpURLConnection.HTTP_FORBIDDEN,
                 -> throw SceneResolutionException(
-                    "Stash rejected the API key. Check the temporary test credentials.",
+                    "Stash rejected the API key. Check the configured server profile.",
                 )
 
                 HttpURLConnection.HTTP_NOT_FOUND -> throw SceneResolutionException(
@@ -85,12 +85,11 @@ class StashSceneResolver {
 
     private fun validateConfiguration(
         serverUrl: String,
-        apiKey: String,
         sceneId: String,
     ) {
-        if (serverUrl.isBlank() || apiKey.isBlank() || sceneId.isBlank()) {
+        if (serverUrl.isBlank() || sceneId.isBlank()) {
             throw SceneResolutionException(
-                "The temporary server address, API key, and scene ID are required.",
+                "The server address and scene ID are required.",
             )
         }
     }
@@ -113,8 +112,11 @@ class StashSceneResolver {
     }
 }
 
-internal fun stashAuthorizationHeaders(apiKey: String): Map<String, String> =
-    mapOf("Authorization" to "Bearer $apiKey")
+internal fun stashAuthorizationHeaders(apiKey: String?): Map<String, String> =
+    apiKey
+        ?.takeIf { it.isNotBlank() }
+        ?.let { mapOf("ApiKey" to it) }
+        .orEmpty()
 
 internal fun parseSceneResponse(
     response: String,

@@ -16,7 +16,7 @@ class ReceiverHomeScreenTest {
     fun firstLaunchIsReadableAndFocusesExit() {
         composeRule.setContent {
             HomeStashTvTheme {
-                ReceiverHomeScreen(onExit = {})
+                ReceiverHomeScreen(onOpenProfiles = {}, onExit = {})
             }
         }
 
@@ -25,7 +25,7 @@ class ReceiverHomeScreenTest {
             .onNodeWithText("Waiting for a Home Stash connection")
             .assertIsDisplayed()
         composeRule
-            .onNodeWithContentDescription("Exit app, focused")
+            .onNodeWithContentDescription("Server profiles, focused")
             .assertIsDisplayed()
     }
 }

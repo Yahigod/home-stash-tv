@@ -3,15 +3,22 @@ package com.yahigod.homestashtv.playback
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StashSceneResolverTest {
     @Test
-    fun `stash authentication uses bearer token`() {
+    fun `stash authentication uses api key header`() {
         assertEquals(
-            mapOf("Authorization" to "Bearer test-api-key"),
+            mapOf("ApiKey" to "test-api-key"),
             stashAuthorizationHeaders("test-api-key"),
         )
+    }
+
+    @Test
+    fun `anonymous Stash omits authentication header`() {
+        assertTrue(stashAuthorizationHeaders(null).isEmpty())
+        assertTrue(stashAuthorizationHeaders("").isEmpty())
     }
 
     @Test
