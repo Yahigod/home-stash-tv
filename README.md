@@ -64,6 +64,13 @@ flags. See [the compatibility notes](docs/DEVICE_COMPATIBILITY.md).
 
 See [the roadmap](docs/ROADMAP.md) and [architecture notes](docs/ARCHITECTURE.md) for scope and acceptance criteria.
 
+## Development signing
+
+CI debug APKs use a persistent development-only signing identity supplied
+through repository secrets. This keeps in-place TV upgrades compatible between
+checkpoints. The development signer must never be reused for a production
+release.
+
 ## License
 
 No license has been selected yet. Until one is added, normal copyright restrictions apply.
