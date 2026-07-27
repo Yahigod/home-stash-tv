@@ -34,19 +34,12 @@ sealed interface ConnectionTestResult {
 class StashConnectionTester {
     suspend fun test(
         serverUrl: String,
-        apiKey: String,
+        apiKey: String?,
     ): ConnectionTestResult = withContext(Dispatchers.IO) {
         val normalizedUrl = try {
             normalizeServerUrl(serverUrl)
         } catch (_: IllegalArgumentException) {
             return@withContext failureFor(ConnectionFailureKind.INVALID_ADDRESS)
-        }
-
-        if (apiKey.isBlank()) {
-            return@withContext ConnectionTestResult.Failure(
-                ConnectionFailureKind.AUTHENTICATION,
-                "Enter an API key before testing this profile.",
-            )
         }
 
         val connection = try {
