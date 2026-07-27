@@ -36,6 +36,7 @@ class PlaybackService : MediaSessionService() {
     private var skippedSceneIds = emptyList<String>()
     private var handlingError = false
     private var networkRetry: Runnable? = null
+    private var terminalState = false
     private var lastReportKey: String? = null
 
     private val stateCheckpoint = object : Runnable {
@@ -53,11 +54,17 @@ class PlaybackService : MediaSessionService() {
             mediaItem: MediaItem?,
             reason: Int,
         ) {
+            if (terminalState) {
+                return
+            }
             persistCurrentState()
             report(if (player.isPlaying) PlaybackStateValue.PLAYING else PlaybackStateValue.PAUSED)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (terminalState) {
+                return
+            }
             persistCurrentState()
             report(if (isPlaying) PlaybackStateValue.PLAYING else PlaybackStateValue.PAUSED)
         }
@@ -164,6 +171,7 @@ class PlaybackService : MediaSessionService() {
         loop = intent.getBooleanExtra(EXTRA_LOOP, false)
         reshuffle = intent.getBooleanExtra(EXTRA_RESHUFFLE, false)
         skippedSceneIds = intent.getStringArrayListExtra(EXTRA_SKIPPED_SCENE_IDS).orEmpty()
+        terminalState = false
         lastReportKey = null
         playCycle(
             sources = sources,
@@ -185,6 +193,7 @@ class PlaybackService : MediaSessionService() {
         loop = false
         reshuffle = false
         skippedSceneIds = emptyList()
+        terminalState = false
         lastReportKey = null
         player.setMediaSources(
             mediaSourcesFor(activeSources, apiKey),
@@ -204,6 +213,7 @@ class PlaybackService : MediaSessionService() {
         loop = state.loop
         reshuffle = state.reshuffle
         skippedSceneIds = emptyList()
+        terminalState = false
         lastReportKey = null
 
         player.setMediaSources(
@@ -224,6 +234,7 @@ class PlaybackService : MediaSessionService() {
         startPositionMs: Long,
         shouldPlay: Boolean,
     ) {
+        terminalState = false
         activeSources = sources
         val apiKey = profiles.getCredential(activeProfileId).orEmpty()
         player.setMediaSources(
@@ -273,6 +284,7 @@ class PlaybackService : MediaSessionService() {
             return
         }
         if (!loop) {
+            terminalState = true
             persistCurrentState()
             report(PlaybackStateValue.COMPLETED, force = true)
             return
@@ -327,6 +339,7 @@ class PlaybackService : MediaSessionService() {
         }
 
         if (remaining.isEmpty()) {
+            terminalState = true
             activeSources = emptyList()
             stateStore.clear()
             report(
@@ -356,6 +369,7 @@ class PlaybackService : MediaSessionService() {
         networkRetry?.let(handler::removeCallbacks)
         networkRetry = null
         handlingError = false
+        terminalState = true
         if (manual) {
             report(PlaybackStateValue.STOPPED, force = true)
             stateStore.clear()
