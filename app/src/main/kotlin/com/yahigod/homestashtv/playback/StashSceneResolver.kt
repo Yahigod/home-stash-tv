@@ -2,6 +2,7 @@ package com.yahigod.homestashtv.playback
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URI
@@ -71,6 +72,61 @@ class StashSceneResolver {
         }
     }
 
+    suspend fun resolveQueue(
+        serverUrl: String,
+        apiKey: String,
+        sceneIds: List<String>,
+        requestedStartIndex: Int,
+    ): ResolvedPlaybackQueue = withContext(Dispatchers.IO) {
+        if (sceneIds.isEmpty() || requestedStartIndex !in sceneIds.indices) {
+            throw QueueResolutionException("Start index is outside the queue.")
+        }
+        val connection = openGraphQlConnection(serverUrl)
+        try {
+            val requestBody = JSONObject()
+                .put("query", FIND_SCENES_QUERY)
+                .put("variables", JSONObject().put("ids", JSONArray(sceneIds)))
+                .toString()
+
+            connection.requestMethod = "POST"
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = QUEUE_READ_TIMEOUT_MS
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json")
+            stashAuthorizationHeaders(apiKey).forEach { (name, value) ->
+                connection.setRequestProperty(name, value)
+            }
+            connection.outputStream.bufferedWriter().use { it.write(requestBody) }
+
+            when (connection.responseCode) {
+                HttpURLConnection.HTTP_UNAUTHORIZED,
+                HttpURLConnection.HTTP_FORBIDDEN,
+                -> throw QueueResolutionException(
+                    "Stash rejected the API key. Check the configured server profile.",
+                )
+
+                HttpURLConnection.HTTP_NOT_FOUND -> throw QueueResolutionException(
+                    "The Stash GraphQL endpoint was not found. Check the server address.",
+                )
+
+                !in 200..299 -> throw QueueResolutionException(
+                    "Stash returned HTTP ${connection.responseCode} while resolving the queue.",
+                )
+            }
+
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            parseQueueResponse(response, serverUrl, sceneIds, requestedStartIndex)
+        } catch (error: QueueResolutionException) {
+            throw error
+        } catch (_: Exception) {
+            throw QueueResolutionException(
+                "Could not reach Stash. Check the server address and local network.",
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private fun openGraphQlConnection(serverUrl: String): HttpURLConnection {
         val normalizedServerUrl = serverUrl.trim().trimEnd('/')
         val uri = URI(normalizedServerUrl)
@@ -97,6 +153,7 @@ class StashSceneResolver {
     companion object {
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 15_000
+        private const val QUEUE_READ_TIMEOUT_MS = 30_000
 
         private val FIND_SCENE_QUERY = """
             query FindScene(${'$'}id: ID!) {
@@ -105,6 +162,20 @@ class StashSceneResolver {
                 title
                 paths {
                   stream
+                }
+              }
+            }
+        """.trimIndent()
+
+        private val FIND_SCENES_QUERY = """
+            query FindScenes(${'$'}ids: [ID!]) {
+              findScenes(ids: ${'$'}ids) {
+                scenes {
+                  id
+                  title
+                  paths {
+                    stream
+                  }
                 }
               }
             }
@@ -137,6 +208,71 @@ internal fun parseSceneResponse(
 
     val scene = root.optJSONObject("data")?.optJSONObject("findScene")
         ?: throw SceneResolutionException("That scene does not exist in this Stash server.")
+    return parseScene(
+        scene = scene,
+        serverUrl = serverUrl,
+        requestedSceneId = requestedSceneId,
+    )
+}
+
+internal fun parseQueueResponse(
+    response: String,
+    serverUrl: String,
+    requestedSceneIds: List<String>,
+    requestedStartIndex: Int,
+): ResolvedPlaybackQueue {
+    val root = runCatching { JSONObject(response) }.getOrNull()
+        ?: throw QueueResolutionException("Stash returned an unreadable queue response.")
+    val values = root.optJSONObject("data")
+        ?.optJSONObject("findScenes")
+        ?.optJSONArray("scenes")
+        ?: throw QueueResolutionException("Stash did not return a compatible queue response.")
+    val scenesById = buildMap {
+        for (index in 0 until values.length()) {
+            val scene = values.optJSONObject(index) ?: continue
+            val id = scene.optString("id")
+            if (id.isNotBlank()) {
+                put(id, scene)
+            }
+        }
+    }
+    val resolved = mutableListOf<Pair<Int, ScenePlaybackSource>>()
+    val skipped = mutableListOf<SkippedScene>()
+    requestedSceneIds.forEachIndexed { index, sceneId ->
+        val scene = scenesById[sceneId]
+        if (scene == null) {
+            skipped += SkippedScene(sceneId, "Scene is missing from this Stash server.")
+            return@forEachIndexed
+        }
+        runCatching { parseScene(scene, serverUrl, sceneId) }
+            .onSuccess { resolved += index to it }
+            .onFailure {
+                skipped += SkippedScene(
+                    sceneId,
+                    it.message ?: "Scene does not have a playable source.",
+                )
+            }
+    }
+    if (resolved.isEmpty()) {
+        throw QueueResolutionException(
+            "None of the ${requestedSceneIds.size} queued scenes can be played from this Stash server.",
+        )
+    }
+    val resolvedStartIndex = resolved.indexOfFirst { it.first >= requestedStartIndex }
+        .takeIf { it >= 0 }
+        ?: 0
+    return ResolvedPlaybackQueue(
+        sources = resolved.map { it.second },
+        startIndex = resolvedStartIndex,
+        skippedScenes = skipped,
+    )
+}
+
+private fun parseScene(
+    scene: JSONObject,
+    serverUrl: String,
+    requestedSceneId: String,
+): ScenePlaybackSource {
     val rawStreamUrl = scene.optJSONObject("paths")
         ?.optString("stream")
         ?.takeIf { it.isNotBlank() }

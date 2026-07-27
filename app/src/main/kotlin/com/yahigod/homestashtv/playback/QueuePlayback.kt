@@ -13,45 +13,6 @@ data class ResolvedPlaybackQueue(
 
 class QueueResolutionException(message: String) : Exception(message)
 
-suspend fun StashSceneResolver.resolveQueue(
-    serverUrl: String,
-    apiKey: String,
-    sceneIds: List<String>,
-    requestedStartIndex: Int,
-): ResolvedPlaybackQueue {
-    require(requestedStartIndex in sceneIds.indices) {
-        "Start index is outside the queue."
-    }
-
-    val resolved = mutableListOf<Pair<Int, ScenePlaybackSource>>()
-    val skipped = mutableListOf<SkippedScene>()
-    sceneIds.forEachIndexed { index, sceneId ->
-        runCatching { resolve(serverUrl, apiKey, sceneId) }
-            .onSuccess { resolved += index to it }
-            .onFailure {
-                skipped += SkippedScene(
-                    sceneId = sceneId,
-                    reason = it.message ?: "Scene could not be resolved.",
-                )
-            }
-    }
-
-    if (resolved.isEmpty()) {
-        throw QueueResolutionException(
-            "None of the ${sceneIds.size} queued scenes can be played from this Stash server.",
-        )
-    }
-
-    val resolvedStartIndex = resolved.indexOfFirst { it.first >= requestedStartIndex }
-        .takeIf { it >= 0 }
-        ?: 0
-    return ResolvedPlaybackQueue(
-        sources = resolved.map { it.second },
-        startIndex = resolvedStartIndex,
-        skippedScenes = skipped,
-    )
-}
-
 internal fun effectiveQueue(
     sources: List<ScenePlaybackSource>,
     startIndex: Int,

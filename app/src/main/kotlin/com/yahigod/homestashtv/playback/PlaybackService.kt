@@ -35,6 +35,7 @@ class PlaybackService : MediaSessionService() {
     private var reshuffle = false
     private var skippedSceneIds = emptyList<String>()
     private var handlingError = false
+    private var networkRetry: Runnable? = null
     private var lastReportKey: String? = null
 
     private val stateCheckpoint = object : Runnable {
@@ -109,6 +110,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(stateCheckpoint)
+        networkRetry?.let(handler::removeCallbacks)
         persistCurrentState()
         player.removeListener(playerListener)
         mediaSession?.release()
@@ -294,6 +296,28 @@ class PlaybackService : MediaSessionService() {
             return
         }
         handlingError = true
+        if (isNetworkInterruption(error)) {
+            persistCurrentState()
+            report(
+                PlaybackStateValue.PAUSED,
+                errorCode = "network_interrupted",
+                force = true,
+            )
+            val retry = Runnable {
+                networkRetry = null
+                if (activeSources.isEmpty()) {
+                    handlingError = false
+                    return@Runnable
+                }
+                handlingError = false
+                player.prepare()
+                player.play()
+            }
+            networkRetry = retry
+            handler.postDelayed(retry, NETWORK_RETRY_INTERVAL_MS)
+            return
+        }
+
         val failedIndex = player.currentMediaItemIndex
             .coerceIn(activeSources.indices)
         val failedSceneId = activeSources[failedIndex].sceneId
@@ -329,6 +353,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun stopPlayback(manual: Boolean) {
+        networkRetry?.let(handler::removeCallbacks)
+        networkRetry = null
+        handlingError = false
         if (manual) {
             report(PlaybackStateValue.STOPPED, force = true)
             stateStore.clear()
@@ -434,8 +461,13 @@ class PlaybackService : MediaSessionService() {
 
         private const val USER_AGENT = "HomeStashTV/0.1"
         private const val STATE_CHECKPOINT_INTERVAL_MS = 5_000L
+        private const val NETWORK_RETRY_INTERVAL_MS = 5_000L
     }
 }
+
+private fun isNetworkInterruption(error: PlaybackException): Boolean =
+    error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
 
 private fun actionablePlaybackErrorCode(error: PlaybackException): String =
     when (error.errorCode) {

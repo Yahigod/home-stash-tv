@@ -83,4 +83,31 @@ class StashSceneResolverTest {
             error.message,
         )
     }
+
+    @Test
+    fun `queue response restores requested order and maps the starting scene`() {
+        val response = """
+            {
+              "data": {
+                "findScenes": {
+                  "scenes": [
+                    {"id":"43","title":"Second","paths":{"stream":"/scene/43/stream"}},
+                    {"id":"42","title":"First","paths":{"stream":"/scene/42/stream"}}
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        val queue = parseQueueResponse(
+            response = response,
+            serverUrl = "http://stash.test",
+            requestedSceneIds = listOf("42", "missing", "43"),
+            requestedStartIndex = 1,
+        )
+
+        assertEquals(listOf("42", "43"), queue.sources.map { it.sceneId })
+        assertEquals(1, queue.startIndex)
+        assertEquals(listOf("missing"), queue.skippedScenes.map { it.sceneId })
+    }
 }
