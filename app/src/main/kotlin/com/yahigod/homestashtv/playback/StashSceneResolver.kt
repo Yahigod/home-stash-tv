@@ -88,9 +88,9 @@ class StashSceneResolver {
         apiKey: String,
         sceneId: String,
     ) {
-        if (serverUrl.isBlank() || apiKey.isBlank() || sceneId.isBlank()) {
+        if (serverUrl.isBlank() || sceneId.isBlank()) {
             throw SceneResolutionException(
-                "The server address, API key, and scene ID are required.",
+                "The server address and scene ID are required.",
             )
         }
     }
@@ -113,8 +113,11 @@ class StashSceneResolver {
     }
 }
 
-internal fun stashAuthorizationHeaders(apiKey: String): Map<String, String> =
-    mapOf("ApiKey" to apiKey)
+internal fun stashAuthorizationHeaders(apiKey: String?): Map<String, String> =
+    apiKey
+        ?.takeIf { it.isNotBlank() }
+        ?.let { mapOf("ApiKey" to it) }
+        .orEmpty()
 
 internal fun parseSceneResponse(
     response: String,
