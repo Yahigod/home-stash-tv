@@ -16,13 +16,18 @@ class ReceiverHomeScreenTest {
     fun firstLaunchIsReadableAndFocusesExit() {
         composeRule.setContent {
             HomeStashTvTheme {
-                ReceiverHomeScreen(onOpenProfiles = {}, onExit = {})
+                ReceiverHomeScreen(
+                    onOpenProfiles = {},
+                    onOpenPairing = {},
+                    connectionMessage = "Bridge not paired",
+                    onExit = {},
+                )
             }
         }
 
         composeRule.onNodeWithText("Receiver ready").assertIsDisplayed()
         composeRule
-            .onNodeWithText("Waiting for a Home Stash connection")
+            .onNodeWithText("Bridge not paired")
             .assertIsDisplayed()
         composeRule
             .onNodeWithContentDescription("Server profiles, focused")

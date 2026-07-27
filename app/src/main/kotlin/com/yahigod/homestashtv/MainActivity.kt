@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,25 +46,36 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackService
 import com.yahigod.homestashtv.profiles.ProfileSettingsActivity
+import com.yahigod.homestashtv.receiver.BridgePairingActivity
+import com.yahigod.homestashtv.receiver.ReceiverRuntime
 import com.yahigod.homestashtv.ui.theme.HomeStashTvTheme
 
 class MainActivity : ComponentActivity() {
     private var playbackProbe: ListenableFuture<MediaController>? = null
+    private val receiverConnection by lazy {
+        ReceiverRuntime.get(applicationContext)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
             HomeStashTvTheme {
+                val connectionStatus by receiverConnection.status.collectAsState()
                 BackHandler(onBack = ::exitApp)
                 ReceiverHomeScreen(
                     onOpenProfiles = {
                         startActivity(Intent(this, ProfileSettingsActivity::class.java))
                     },
+                    onOpenPairing = {
+                        startActivity(Intent(this, BridgePairingActivity::class.java))
+                    },
+                    connectionMessage = connectionStatus.message,
                     onExit = ::exitApp,
                 )
             }
         }
+        receiverConnection.start()
     }
 
     override fun onStart() {
@@ -112,6 +124,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun exitApp() {
+        receiverConnection.stop()
         finishAndRemoveTask()
     }
 }
@@ -119,6 +132,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 internal fun ReceiverHomeScreen(
     onOpenProfiles: () -> Unit,
+    onOpenPairing: () -> Unit,
+    connectionMessage: String,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -163,7 +178,7 @@ internal fun ReceiverHomeScreen(
             )
             Spacer(modifier = Modifier.height(18.dp))
             Text(
-                text = ReceiverStatus.IDLE.message,
+                text = connectionMessage,
                 color = Color(0xFFC5D3DF),
                 fontSize = 26.sp,
                 textAlign = TextAlign.Center,
@@ -200,6 +215,31 @@ internal fun ReceiverHomeScreen(
             ) {
                 Text(
                     text = "Server profiles",
+                    fontSize = 24.sp,
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
+                onClick = onOpenPairing,
+                colors = ButtonDefaults.colors(
+                    containerColor = Color(0xFF20384D),
+                    focusedContainerColor = Color(0xFFE9F7FF),
+                    contentColor = Color.White,
+                    focusedContentColor = Color(0xFF07121D),
+                ),
+                border = ButtonDefaults.border(
+                    focusedBorder = Border(
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 3.dp,
+                            color = Color(0xFF64C7FF),
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                ),
+            ) {
+                Text(
+                    text = "Bridge pairing",
                     fontSize = 24.sp,
                     modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
                 )
