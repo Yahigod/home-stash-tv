@@ -96,6 +96,10 @@ Exit criteria:
 - The receiver survives network interruption and app recreation without accidental duplicate playback.
 - Queue policy has deterministic automated tests.
 
+Implementation note: crash recovery always restores paused. A normal BACK or
+task exit clears the recovery record, so recovery cannot create surprise
+autoplay.
+
 ## 6. Home Stash Send to TV integration
 
 Deliverables:

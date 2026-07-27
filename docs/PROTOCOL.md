@@ -116,6 +116,48 @@ acknowledgement, expires them before delivery, and may redeliver an unacked
 command after reconnection. This is at-least-once delivery with exactly-once
 command start at the receiver.
 
+## Playback state
+
+After accepting a command, the receiver sends credential-free state updates:
+
+```json
+{
+  "v": 1,
+  "type": "playback_state",
+  "command_id": "uuid",
+  "state": "playing",
+  "at_ms": 1785146405000,
+  "scene_id": "43",
+  "queue_index": 1,
+  "position_ms": 2500,
+  "skipped_scene_ids": ["42"]
+}
+```
+
+States are `resolving`, `playing`, `paused`, `stopped`, `completed`, and
+`failed`. `error_code` is optional and contains only a stable non-secret code.
+The report never contains a server address, media URL, API key, pairing token,
+or receiver token. The bridge accepts state only for a command belonging to
+the authenticated receiver and exposes the latest report to authenticated
+senders.
+
+## Queue policy and recovery
+
+The first playback cycle retains the sender's scene order and starts at
+`start_index` and `start_position_ms`. When `continue` is false, only the
+starting scene is played. `loop` starts another cycle after the final playable
+scene. `reshuffle` changes each later cycle while avoiding both an immediate
+boundary repeat and, for queues of three or more scenes, an identical cycle.
+Two-scene queues retain their order because reversing them would repeat the
+previous final scene.
+
+Missing scenes and sources are skipped in sender order and reported. Runtime
+format failures skip only the failed item; network interruption retries the
+same item without advancing the queue. The current queue and position are
+stored locally without credentials. Process recovery reconstructs the queue
+paused, while BACK/normal exit clears recovery state so playback cannot start
+unexpectedly later.
+
 ## Revocation and logging
 
 Revocation marks the receiver disabled, closes its active socket, and rejects

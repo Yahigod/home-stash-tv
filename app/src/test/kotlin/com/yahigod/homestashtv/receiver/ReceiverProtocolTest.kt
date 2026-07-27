@@ -79,6 +79,29 @@ class ReceiverProtocolTest {
         assertFalse(encoded.contains("private.invalid"))
         assertFalse(encoded.contains("api", ignoreCase = true))
     }
+
+    @Test
+    fun `playback state reports queue progress without media or credentials`() {
+        val encoded = encodePlaybackState(
+            PlaybackStateReport(
+                commandId = "command-1",
+                state = PlaybackStateValue.PLAYING,
+                atMs = 4000,
+                sceneId = "43",
+                queueIndex = 1,
+                positionMs = 2500,
+                skippedSceneIds = listOf("42"),
+            ),
+        )
+        val value = JSONObject(encoded)
+
+        assertEquals("playback_state", value.getString("type"))
+        assertEquals("playing", value.getString("state"))
+        assertEquals(1, value.getInt("queue_index"))
+        assertEquals("42", value.getJSONArray("skipped_scene_ids").getString(0))
+        assertFalse(encoded.contains("http"))
+        assertFalse(encoded.contains("token", ignoreCase = true))
+    }
 }
 
 internal fun commandJson(

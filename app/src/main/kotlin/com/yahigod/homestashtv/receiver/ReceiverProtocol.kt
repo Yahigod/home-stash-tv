@@ -34,6 +34,26 @@ data class CommandAcknowledgement(
     val errorCode: String? = null,
 )
 
+enum class PlaybackStateValue(val wireValue: String) {
+    RESOLVING("resolving"),
+    PLAYING("playing"),
+    PAUSED("paused"),
+    STOPPED("stopped"),
+    COMPLETED("completed"),
+    FAILED("failed"),
+}
+
+data class PlaybackStateReport(
+    val commandId: String,
+    val state: PlaybackStateValue,
+    val atMs: Long,
+    val sceneId: String? = null,
+    val queueIndex: Int? = null,
+    val positionMs: Long? = null,
+    val errorCode: String? = null,
+    val skippedSceneIds: List<String> = emptyList(),
+)
+
 class ProtocolException(
     val errorCode: String,
     message: String,
@@ -96,6 +116,24 @@ fun encodeAcknowledgement(value: CommandAcknowledgement): String =
         .put("at_ms", value.atMs)
         .apply {
             value.errorCode?.let { put("error_code", it) }
+        }
+        .toString()
+
+fun encodePlaybackState(value: PlaybackStateReport): String =
+    JSONObject()
+        .put("v", RECEIVER_PROTOCOL_VERSION)
+        .put("type", "playback_state")
+        .put("command_id", value.commandId)
+        .put("state", value.state.wireValue)
+        .put("at_ms", value.atMs)
+        .apply {
+            value.sceneId?.let { put("scene_id", it) }
+            value.queueIndex?.let { put("queue_index", it) }
+            value.positionMs?.let { put("position_ms", it.coerceAtLeast(0L)) }
+            value.errorCode?.let { put("error_code", it) }
+            if (value.skippedSceneIds.isNotEmpty()) {
+                put("skipped_scene_ids", JSONArray(value.skippedSceneIds))
+            }
         }
         .toString()
 
