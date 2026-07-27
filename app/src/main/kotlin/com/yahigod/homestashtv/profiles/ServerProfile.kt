@@ -59,10 +59,6 @@ internal class StoredServerProfileRepository(
         require(profile.serverUrl.isNotBlank()) { "Server address is required." }
 
         val existing = metadataStore.load()
-        val alreadyExists = existing.any { it.id == profile.id }
-        if (!alreadyExists && newCredential.isNullOrBlank()) {
-            throw IllegalArgumentException("An API key is required for a new profile.")
-        }
 
         if (!newCredential.isNullOrBlank()) {
             credentialStore.put(profile.id, newCredential)
