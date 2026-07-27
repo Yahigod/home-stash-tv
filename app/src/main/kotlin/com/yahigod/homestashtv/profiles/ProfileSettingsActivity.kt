@@ -131,7 +131,7 @@ private fun ProfileList(
         ) {
             ScreenHeading(
                 title = "Stash servers",
-                subtitle = "Credentials are encrypted on this TV and never shown again.",
+                subtitle = "API keys are optional and encrypted on this TV when used.",
             )
             Spacer(modifier = Modifier.height(30.dp))
 
@@ -216,6 +216,9 @@ private fun ProfileEditor(
     var statusIsError by remember { mutableStateOf(false) }
     var isTesting by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val hasStoredCredential = existingProfile
+        ?.let { !repository.getCredential(it.id).isNullOrBlank() }
+        ?: false
 
     BackHandler(onBack = onCancel)
     LaunchedEffect(Unit) {
@@ -234,10 +237,13 @@ private fun ProfileEditor(
         ) {
             ScreenHeading(
                 title = if (existingProfile == null) "Add Stash server" else "Edit Stash server",
-                subtitle = if (existingProfile == null) {
-                    "Use the server address reachable from this TV."
-                } else {
-                    "Leave the API key blank to keep the encrypted key already stored."
+                subtitle = when {
+                    existingProfile == null ->
+                        "API key is optional; leave it blank for anonymous access."
+                    hasStoredCredential ->
+                        "Leave the API key blank to keep the encrypted key already stored."
+                    else ->
+                        "No API key is stored; leave it blank for anonymous access."
                 },
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -259,10 +265,18 @@ private fun ProfileEditor(
             )
             Spacer(modifier = Modifier.height(18.dp))
             ProfileTextField(
-                label = if (existingProfile == null) "API key" else "New API key (optional)",
+                label = if (existingProfile == null) {
+                    "API key (optional)"
+                } else {
+                    "New API key (optional)"
+                },
                 value = apiKey,
                 onValueChange = { apiKey = it },
-                placeholder = if (existingProfile == null) "Required" else "Stored securely",
+                placeholder = when {
+                    existingProfile == null -> "Leave blank for anonymous access"
+                    hasStoredCredential -> "Stored securely"
+                    else -> "Anonymous access"
+                },
                 keyboardType = KeyboardType.Password,
                 visualTransformation = PasswordVisualTransformation(),
             )
@@ -279,7 +293,7 @@ private fun ProfileEditor(
 
             if (confirmDelete && existingProfile != null) {
                 Text(
-                    text = "Delete ${existingProfile.name} and its local credential?",
+                    text = "Delete ${existingProfile.name} and any local credential?",
                     color = Color(0xFFFFDAD6),
                     fontSize = 23.sp,
                 )
@@ -306,11 +320,6 @@ private fun ProfileEditor(
                     TvButton(
                         onClick = {
                             val credential = currentCredential()
-                            if (credential.isNullOrBlank()) {
-                                statusMessage = "Enter an API key before testing this profile."
-                                statusIsError = true
-                                return@TvButton
-                            }
                             isTesting = true
                             statusMessage = "Testing connection…"
                             statusIsError = false
@@ -353,10 +362,6 @@ private fun ProfileEditor(
                                 normalizedUrl == null -> {
                                     statusMessage =
                                         "Enter a complete HTTP or HTTPS server address."
-                                    statusIsError = true
-                                }
-                                currentCredential().isNullOrBlank() -> {
-                                    statusMessage = "Enter an API key."
                                     statusIsError = true
                                 }
                                 else -> {
