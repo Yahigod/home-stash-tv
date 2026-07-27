@@ -108,6 +108,57 @@ class StashSceneResolverTest {
 
         assertEquals(listOf("42", "43"), queue.sources.map { it.sceneId })
         assertEquals(1, queue.startIndex)
+        assertFalse(queue.startPositionApplies)
         assertEquals(listOf("missing"), queue.skippedScenes.map { it.sceneId })
+    }
+
+    @Test
+    fun `queue falls back to individual scene results when batch rejects a missing ID`() {
+        val request = buildIndividualQueueRequest(listOf("42", "999999", "43"))
+        val response = """
+            {
+              "errors": [{"message": "Scene was not found"}],
+              "data": {
+                "scene0": {
+                  "id": "42",
+                  "title": "First",
+                  "paths": {"stream": "/scene/42/stream"}
+                },
+                "scene1": null,
+                "scene2": {
+                  "id": "43",
+                  "title": "Second",
+                  "paths": {"stream": "/scene/43/stream"}
+                }
+              }
+            }
+        """.trimIndent()
+
+        val queue = parseIndividualQueueResponse(
+            response = response,
+            serverUrl = "http://stash.test",
+            requestedSceneIds = listOf("42", "999999", "43"),
+            requestedStartIndex = 0,
+            aliasesBySceneId = request.aliasesBySceneId,
+        )
+
+        assertEquals(listOf("42", "43"), queue.sources.map { it.sceneId })
+        assertEquals(listOf("999999"), queue.skippedScenes.map { it.sceneId })
+        assertEquals("42", request.variables.getString("id0"))
+        assertTrue(queue.startPositionApplies)
+    }
+
+    @Test
+    fun `batch GraphQL errors trigger individual scene fallback`() {
+        assertTrue(
+            queueResponseNeedsIndividualFallback(
+                """{"errors":[{"message":"missing"}],"data":{"findScenes":null}}""",
+            ),
+        )
+        assertFalse(
+            queueResponseNeedsIndividualFallback(
+                """{"data":{"findScenes":{"scenes":[]}}}""",
+            ),
+        )
     }
 }
