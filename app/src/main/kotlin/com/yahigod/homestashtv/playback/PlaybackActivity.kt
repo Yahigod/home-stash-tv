@@ -189,6 +189,7 @@ private fun QueuePlaybackScreen(
     val context = LocalContext.current
     val surfaceFocusRequester = remember { FocusRequester() }
     val primaryControlFocusRequester = remember { FocusRequester() }
+    val primedPausedMediaItems = remember { mutableSetOf<String>() }
     var title by remember { mutableStateOf<String?>(null) }
     var resolutionError by remember { mutableStateOf(configurationError) }
     var queueWarning by remember { mutableStateOf<String?>(null) }
@@ -196,6 +197,12 @@ private fun QueuePlaybackScreen(
     var controllerError by remember { mutableStateOf<String?>(null) }
     var playbackError by remember { mutableStateOf<String?>(null) }
     var controlFeedback by remember { mutableStateOf<String?>(null) }
+    var isResolvingQueue by remember {
+        mutableStateOf(!reconnectOnly && configurationError == null)
+    }
+    var hasMediaItem by remember { mutableStateOf(false) }
+    var playerPlaybackState by remember { mutableIntStateOf(Player.STATE_IDLE) }
+    var playWhenReady by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var queueIndex by remember { mutableIntStateOf(0) }
@@ -203,6 +210,13 @@ private fun QueuePlaybackScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var overlayVisible by remember { mutableStateOf(true) }
     var overlayInteraction by remember { mutableIntStateOf(0) }
+
+    fun updateControllerSnapshot(activeController: MediaController) {
+        hasMediaItem = activeController.currentMediaItem != null
+        playerPlaybackState = activeController.playbackState
+        playWhenReady = activeController.playWhenReady
+        isPlaying = activeController.isPlaying
+    }
 
     DisposableEffect(context) {
         val sessionToken = SessionToken(
@@ -217,7 +231,9 @@ private fun QueuePlaybackScreen(
                 runCatching { controllerFuture.get() }
                     .onSuccess {
                         if (!disposed) {
+                            controllerError = null
                             controller = it
+                            updateControllerSnapshot(it)
                             if (reconnectOnly && it.currentMediaItem == null) {
                                 controllerError = "No active queue is available to resume."
                             }
@@ -254,12 +270,16 @@ private fun QueuePlaybackScreen(
         configurationError,
     ) {
         resolutionError = configurationError
+        isResolvingQueue = !reconnectOnly && configurationError == null
         if (reconnectOnly || configurationError != null) {
+            isResolvingQueue = false
             return@LaunchedEffect
         }
+        controllerError = null
         playbackError = null
         queueWarning = null
         if (requestedStartIndex !in sceneIds.indices) {
+            isResolvingQueue = false
             resolutionError = "The requested starting scene is outside the queue."
             reportResolutionFailure(context, commandId, "invalid_queue")
             return@LaunchedEffect
@@ -335,7 +355,9 @@ private fun QueuePlaybackScreen(
                     },
                 )
             }
+            isResolvingQueue = false
         }.onFailure {
+            isResolvingQueue = false
             resolutionError = when (it) {
                 is QueueResolutionException,
                 is SceneResolutionException,
@@ -353,7 +375,7 @@ private fun QueuePlaybackScreen(
         } else {
             val listener = object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
-                    playbackError = actionablePlaybackError(error)
+                    playbackError = actionablePlaybackError(error.errorCode)
                 }
 
                 override fun onMediaItemTransition(
@@ -362,11 +384,27 @@ private fun QueuePlaybackScreen(
                 ) {
                     playbackError = null
                     title = mediaItem?.mediaMetadata?.title?.toString()
+                    hasMediaItem = mediaItem != null
+                }
+
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    playerPlaybackState = playbackState
+                }
+
+                override fun onPlayWhenReadyChanged(
+                    playWhenReadyValue: Boolean,
+                    reason: Int,
+                ) {
+                    playWhenReady = playWhenReadyValue
+                }
+
+                override fun onIsPlayingChanged(isPlayingValue: Boolean) {
+                    isPlaying = isPlayingValue
                 }
             }
             activeController.addListener(listener)
             activeController.playerError?.let {
-                playbackError = actionablePlaybackError(it)
+                playbackError = actionablePlaybackError(it.errorCode)
             }
             onDispose { activeController.removeListener(listener) }
         }
@@ -376,11 +414,11 @@ private fun QueuePlaybackScreen(
         while (true) {
             controller?.let {
                 title = it.currentMediaItem?.mediaMetadata?.title?.toString()
+                updateControllerSnapshot(it)
                 positionMs = it.currentPosition.coerceAtLeast(0L)
                 durationMs = it.duration.coerceAtLeast(0L)
                 queueIndex = it.currentMediaItemIndex.coerceAtLeast(0)
                 queueSize = it.mediaItemCount
-                isPlaying = it.isPlaying
             }
             delay(PROGRESS_UPDATE_MS)
         }
@@ -395,8 +433,18 @@ private fun QueuePlaybackScreen(
 
     val error = resolutionError ?: controllerError ?: playbackError
     val activeController = controller
-    val canAutoHideOverlay = shouldAutoHidePlaybackOverlay(
+    val presentationState = playbackPresentationState(
+        hasError = error != null,
+        isResolvingQueue = isResolvingQueue,
+        reconnectOnly = reconnectOnly,
+        controllerConnected = activeController != null,
+        hasMediaItem = hasMediaItem,
+        playbackState = playerPlaybackState,
+        playWhenReady = playWhenReady,
         isPlaying = isPlaying,
+    )
+    val canAutoHideOverlay = shouldAutoHidePlaybackOverlay(
+        isPlaying = presentationState == PlaybackPresentationState.PLAYING,
         hasPlaybackError = error != null,
         hasControlFeedback = controlFeedback != null,
     )
@@ -412,8 +460,12 @@ private fun QueuePlaybackScreen(
         }
     }
 
-    LaunchedEffect(showOverlay, activeController, error) {
-        if (showOverlay && activeController != null && error == null) {
+    val controlsReady = activeController != null &&
+        hasMediaItem &&
+        presentationState != PlaybackPresentationState.FAILED
+
+    LaunchedEffect(showOverlay, controlsReady) {
+        if (showOverlay && controlsReady) {
             primaryControlFocusRequester.requestFocus()
         } else {
             surfaceFocusRequester.requestFocus()
@@ -454,9 +506,14 @@ private fun QueuePlaybackScreen(
                 update = { playerView ->
                     if (playerView.player !== activeController) {
                         playerView.player = activeController
+                    }
 
+                    if (reconnectOnly) {
+                        val primeKey = activeController.currentMediaItem?.mediaId
+                            ?.let { "$it:${activeController.currentMediaItemIndex}" }
                         if (
-                            reconnectOnly &&
+                            primeKey != null &&
+                            primeKey !in primedPausedMediaItems &&
                             shouldPrimePausedVideoFrame(
                                 hasMediaItem = activeController.currentMediaItem != null,
                                 playbackState = activeController.playbackState,
@@ -467,11 +524,11 @@ private fun QueuePlaybackScreen(
                                 if (
                                     playerView.player === activeController &&
                                     shouldPrimePausedVideoFrame(
-                                        hasMediaItem =
-                                        activeController.currentMediaItem != null,
+                                        hasMediaItem = activeController.currentMediaItem != null,
                                         playbackState = activeController.playbackState,
                                         playWhenReady = activeController.playWhenReady,
-                                    )
+                                    ) &&
+                                    primedPausedMediaItems.add(primeKey)
                                 ) {
                                     activeController.seekTo(
                                         activeController.currentMediaItemIndex,
@@ -489,7 +546,8 @@ private fun QueuePlaybackScreen(
         if (showOverlay) {
             PlaybackOverlay(
                 title = title,
-                isPlaying = isPlaying,
+                presentationState = presentationState,
+                playWhenReady = playWhenReady,
                 positionMs = positionMs,
                 durationMs = durationMs,
                 queueIndex = queueIndex,
@@ -497,7 +555,7 @@ private fun QueuePlaybackScreen(
                 warning = queueWarning,
                 controlFeedback = controlFeedback,
                 error = error,
-                controlsReady = activeController != null,
+                controlsReady = controlsReady,
                 primaryControlFocusRequester = primaryControlFocusRequester,
                 onTogglePlayback = {
                     onOverlayInteraction()
@@ -511,7 +569,8 @@ private fun QueuePlaybackScreen(
 @Composable
 private fun PlaybackOverlay(
     title: String?,
-    isPlaying: Boolean,
+    presentationState: PlaybackPresentationState,
+    playWhenReady: Boolean,
     positionMs: Long,
     durationMs: Long,
     queueIndex: Int,
@@ -523,13 +582,6 @@ private fun PlaybackOverlay(
     primaryControlFocusRequester: FocusRequester,
     onTogglePlayback: () -> Unit,
 ) {
-    val status = when {
-        error != null -> "Playback stopped"
-        title == null -> "Resolving queue from Stash…"
-        isPlaying -> "Playing"
-        else -> "Paused or buffering"
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -560,7 +612,7 @@ private fun PlaybackOverlay(
             )
             Text(
                 text = buildString {
-                    append(status)
+                    append(presentationState.statusText)
                     if (queueSize > 0) {
                         append("  •  Queue ${queueIndex + 1}/$queueSize")
                     }
@@ -606,7 +658,8 @@ private fun PlaybackOverlay(
                 )
             }
         } else {
-            controlFeedback?.let {
+            val centerMessage = controlFeedback ?: presentationState.attentionText
+            centerMessage?.let {
                 Text(
                     text = it,
                     color = Color.White,
@@ -648,7 +701,7 @@ private fun PlaybackOverlay(
                         ),
                     ) {
                         Text(
-                            text = if (isPlaying) "Pause" else "Play",
+                            text = if (playWhenReady) "Pause" else "Play",
                             fontSize = 22.sp,
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
                         )
@@ -700,7 +753,7 @@ private fun handlePlaybackKey(
 
 private fun togglePlayback(controller: MediaController?) {
     controller?.let {
-        if (it.isPlaying) it.pause() else it.play()
+        if (it.playWhenReady) it.pause() else it.play()
     }
 }
 
@@ -768,19 +821,21 @@ private fun trackLabel(format: Format): String =
         ?: format.id
         ?: "Track"
 
-private fun actionablePlaybackError(error: PlaybackException): String =
-    when (error.errorCode) {
+internal fun actionablePlaybackError(errorCode: Int): String =
+    when (errorCode) {
         PlaybackException.ERROR_CODE_DECODING_FAILED,
         PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
         PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
         -> "The TV decoder cannot play this file's video or audio format."
 
-        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+            "Stash refused the media request. Check the server profile and media access."
+
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-        -> "Stash could not serve the media. Check the local network and API access."
+        -> "The TV lost its connection to Stash. Check the local network and try again."
 
-        else -> "Media3 reported ${error.errorCodeName}. Try another scene or file format."
+        else -> "Playback failed. Try another scene or file format."
     }
 
 private fun reportResolutionFailure(
