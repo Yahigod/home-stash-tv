@@ -3,7 +3,9 @@
 Native Android TV receiver for [Stash](https://github.com/stashapp/stash), designed to grow into a full TV client.
 
 > [!IMPORTANT]
-> This project is pre-alpha. The first release will be a receiver controlled by Home Stash; library browsing is intentionally deferred.
+> The receiver MVP has passed supervised playback acceptance on the first Tesla
+> target, but the first production-signed release has not been published yet.
+> Library browsing is intentionally deferred.
 
 ## Receiver MVP
 
@@ -75,6 +77,14 @@ Debug builds also include a one-shot migration entry point for a development
 signing reset. It reads only a fixed file in the app's private directory,
 deletes that input after one attempt, and never accepts secrets through intent
 extras or logs. Release builds do not contain this component.
+
+## Releases
+
+Production releases use a separate owner-held signing identity and are
+published only from a version-matching Git tag after tests, lint, signature
+verification, and checksum generation pass. See the
+[release policy](docs/RELEASES.md) and
+[installation and recovery guide](docs/INSTALLATION.md).
 
 ## License
 

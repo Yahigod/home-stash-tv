@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out tagged revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a tagged main revision
+        run: |
+          git fetch --no-tags origin main
+          test "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" = tag
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: Validate tag and release policy
+        run: python3 scripts/validate-release-policy.py --tag "$GITHUB_REF_NAME"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Configure production signing
+        env:
+          HOME_STASH_TV_RELEASE_KEYSTORE_B64: ${{ secrets.HOME_STASH_TV_RELEASE_KEYSTORE_B64 }}
+          HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD }}
+          HOME_STASH_TV_RELEASE_KEY_ALIAS: ${{ secrets.HOME_STASH_TV_RELEASE_KEY_ALIAS }}
+          HOME_STASH_TV_RELEASE_KEY_PASSWORD: ${{ secrets.HOME_STASH_TV_RELEASE_KEY_PASSWORD }}
+        run: |
+          for name in \
+            HOME_STASH_TV_RELEASE_KEYSTORE_B64 \
+            HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD \
+            HOME_STASH_TV_RELEASE_KEY_ALIAS \
+            HOME_STASH_TV_RELEASE_KEY_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::Production signing is not configured."
+              exit 1
+            fi
+          done
+          printf '%s' "$HOME_STASH_TV_RELEASE_KEYSTORE_B64" \
+            | base64 --decode > "$RUNNER_TEMP/home-stash-tv-release.p12"
+          chmod 600 "$RUNNER_TEMP/home-stash-tv-release.p12"
+
+      - name: Test and build signed release
+        env:
+          HOME_STASH_TV_RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/home-stash-tv-release.p12
+          HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD }}
+          HOME_STASH_TV_RELEASE_KEY_ALIAS: ${{ secrets.HOME_STASH_TV_RELEASE_KEY_ALIAS }}
+          HOME_STASH_TV_RELEASE_KEY_PASSWORD: ${{ secrets.HOME_STASH_TV_RELEASE_KEY_PASSWORD }}
+        run: >-
+          ./gradlew --no-daemon
+          testDebugUnitTest lintDebug lintRelease assembleRelease
+
+      - name: Verify and package release
+        run: |
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -f "$apk"
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk" \
+            | tee signing-certificate.txt
+          grep -q 'Signer #1 certificate SHA-256 digest:' signing-certificate.txt
+          mkdir -p dist
+          cp "$apk" "dist/home-stash-tv-${GITHUB_REF_NAME}.apk"
+          cp signing-certificate.txt dist/
+          (
+            cd dist
+            sha256sum "home-stash-tv-${GITHUB_REF_NAME}.apk" > SHA256SUMS
+          )
+
+      - name: Upload immutable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-stash-tv-${{ github.ref_name }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Home Stash TV $GITHUB_REF_NAME" \
+            --generate-notes \
+            "${prerelease[@]}"

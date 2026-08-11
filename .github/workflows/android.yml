@@ -37,6 +37,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Validate release policy
+        run: python3 scripts/validate-release-policy.py
+
       - name: Configure stable development signing
         env:
           HOME_STASH_TV_DEBUG_KEYSTORE_B64: ${{ secrets.HOME_STASH_TV_DEBUG_KEYSTORE_B64 }}
@@ -65,7 +68,9 @@ jobs:
           HOME_STASH_TV_KEYSTORE_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEYSTORE_PASSWORD }}
           HOME_STASH_TV_KEY_ALIAS: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_ALIAS }}
           HOME_STASH_TV_KEY_PASSWORD: ${{ secrets.HOME_STASH_TV_DEBUG_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+        run: >-
+          ./gradlew --no-daemon
+          testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

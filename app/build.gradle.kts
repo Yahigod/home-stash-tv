@@ -19,6 +19,45 @@ if (developmentSigningValues.any { !it.isNullOrBlank() } && !developmentSigningC
     throw GradleException("Development signing configuration is incomplete.")
 }
 
+val productionKeystoreFile =
+    providers.environmentVariable("HOME_STASH_TV_RELEASE_KEYSTORE_FILE").orNull
+val productionKeystorePassword =
+    providers.environmentVariable("HOME_STASH_TV_RELEASE_KEYSTORE_PASSWORD").orNull
+val productionKeyAlias =
+    providers.environmentVariable("HOME_STASH_TV_RELEASE_KEY_ALIAS").orNull
+val productionKeyPassword =
+    providers.environmentVariable("HOME_STASH_TV_RELEASE_KEY_PASSWORD").orNull
+val productionSigningValues = listOf(
+    productionKeystoreFile,
+    productionKeystorePassword,
+    productionKeyAlias,
+    productionKeyPassword,
+)
+val productionSigningConfigured = productionSigningValues.all { !it.isNullOrBlank() }
+if (productionSigningValues.any { !it.isNullOrBlank() } && !productionSigningConfigured) {
+    throw GradleException("Production signing configuration is incomplete.")
+}
+if (
+    developmentSigningConfigured &&
+    productionSigningConfigured &&
+    file(developmentKeystoreFile!!).canonicalFile == file(productionKeystoreFile!!).canonicalFile
+) {
+    throw GradleException("Development and production signing must use different keystores.")
+}
+
+val releaseVersionCode = providers.gradleProperty("homeStashTvVersionCode").get().toIntOrNull()
+    ?: throw GradleException("homeStashTvVersionCode must be an integer.")
+val releaseVersionName = providers.gradleProperty("homeStashTvVersionName").get().trim()
+if (releaseVersionCode < 1) {
+    throw GradleException("homeStashTvVersionCode must be positive.")
+}
+if (!releaseVersionName.matches(
+        Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?"),
+    )
+) {
+    throw GradleException("homeStashTvVersionName must be a semantic version.")
+}
+
 android {
     namespace = "com.yahigod.homestashtv"
     compileSdk = 36
@@ -27,8 +66,8 @@ android {
         applicationId = "com.yahigod.homestashtv"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-dev"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -42,12 +81,20 @@ android {
                 keyPassword = developmentKeyPassword!!
             }
         }
+        if (productionSigningConfigured) {
+            create("production") {
+                storeFile = file(productionKeystoreFile!!)
+                storePassword = productionKeystorePassword!!
+                keyAlias = productionKeyAlias!!
+                keyPassword = productionKeyPassword!!
+            }
+        }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            versionNameSuffix = "-dev"
             if (developmentSigningConfigured) {
                 signingConfig = signingConfigs.getByName("development")
             }
@@ -55,6 +102,9 @@ android {
 
         release {
             isMinifyEnabled = false
+            if (productionSigningConfigured) {
+                signingConfig = signingConfigs.getByName("production")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
