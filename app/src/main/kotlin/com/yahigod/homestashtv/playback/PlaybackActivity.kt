@@ -637,11 +637,11 @@ private fun handlePlaybackKey(
     onFeedback: (String) -> Unit,
     onExit: () -> Unit,
 ): Boolean {
-    if (event.action != KeyEvent.ACTION_DOWN) {
-        return false
-    }
-
-    val decision = playbackKeyDecision(event.keyCode, event.repeatCount)
+    val decision = playbackKeyDecision(
+        keyCode = event.keyCode,
+        repeatCount = event.repeatCount,
+        action = event.action,
+    )
     if (decision.revealOverlay) {
         onInteraction()
     }

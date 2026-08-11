@@ -81,6 +81,32 @@ class PlaybackOverlayPolicyTest {
     }
 
     @Test
+    fun `select release is consumed without toggling focused playback control again`() {
+        val decision = playbackKeyDecision(
+            keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            repeatCount = 0,
+            action = KeyEvent.ACTION_UP,
+        )
+
+        assertTrue(decision.consumed)
+        assertFalse(decision.revealOverlay)
+        assertNull(decision.command)
+    }
+
+    @Test
+    fun `unrelated key release remains available to the system`() {
+        val decision = playbackKeyDecision(
+            keyCode = KeyEvent.KEYCODE_VOLUME_UP,
+            repeatCount = 0,
+            action = KeyEvent.ACTION_UP,
+        )
+
+        assertFalse(decision.consumed)
+        assertFalse(decision.revealOverlay)
+        assertNull(decision.command)
+    }
+
+    @Test
     fun `back preserves immediate exit without flashing the overlay`() {
         val decision = playbackKeyDecision(KeyEvent.KEYCODE_BACK, repeatCount = 0)
 
