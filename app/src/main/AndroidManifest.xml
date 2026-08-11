@@ -38,7 +38,9 @@
         <activity
             android:name=".playback.PlaybackActivity"
             android:exported="false"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
 
         <activity
             android:name=".profiles.ProfileSettingsActivity"
