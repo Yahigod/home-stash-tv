@@ -13,6 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SEMVER = re.compile(
     r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\Z",
 )
+ACTION_REFS = {
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961",
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699",
+    "gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -86,6 +93,16 @@ def validate(tag: str | None) -> None:
     )
     require("validate-release-policy.py" in pull_request_workflow, "CI omits release policy.")
     require("assembleRelease" in pull_request_workflow, "CI omits the release variant.")
+
+    for name, workflow in (
+        ("Android", pull_request_workflow),
+        ("Release", release_workflow),
+    ):
+        actual_refs = set(re.findall(r"^\s*uses:\s+([^\s#]+)", workflow, re.MULTILINE))
+        require(
+            actual_refs == ACTION_REFS,
+            f"{name} workflow action pins differ from the reviewed allowlist.",
+        )
 
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
     for marker in ("*.jks", "*.keystore", "*.p12", "keystore.properties"):
