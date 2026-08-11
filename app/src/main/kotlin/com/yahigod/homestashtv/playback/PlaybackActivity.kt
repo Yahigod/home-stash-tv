@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +50,9 @@ import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import com.yahigod.homestashtv.profiles.AndroidServerProfileRepository
 import com.yahigod.homestashtv.receiver.PlaybackStateReport
@@ -151,7 +155,8 @@ private fun QueuePlaybackScreen(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
-    val focusRequester = remember { FocusRequester() }
+    val surfaceFocusRequester = remember { FocusRequester() }
+    val primaryControlFocusRequester = remember { FocusRequester() }
     var title by remember { mutableStateOf<String?>(null) }
     var resolutionError by remember { mutableStateOf(configurationError) }
     var queueWarning by remember { mutableStateOf<String?>(null) }
@@ -164,6 +169,8 @@ private fun QueuePlaybackScreen(
     var queueIndex by remember { mutableIntStateOf(0) }
     var queueSize by remember { mutableIntStateOf(0) }
     var isPlaying by remember { mutableStateOf(false) }
+    var overlayVisible by remember { mutableStateOf(true) }
+    var overlayInteraction by remember { mutableIntStateOf(0) }
 
     DisposableEffect(context) {
         val sessionToken = SessionToken(
@@ -351,22 +358,49 @@ private fun QueuePlaybackScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
     val error = resolutionError ?: controllerError ?: playbackError
     val activeController = controller
+    val canAutoHideOverlay = shouldAutoHidePlaybackOverlay(
+        isPlaying = isPlaying,
+        hasPlaybackError = error != null,
+        hasControlFeedback = controlFeedback != null,
+    )
+    val showOverlay = overlayVisible || !canAutoHideOverlay
+
+    LaunchedEffect(canAutoHideOverlay, overlayInteraction) {
+        if (canAutoHideOverlay) {
+            overlayVisible = true
+            delay(PLAYBACK_OVERLAY_TIMEOUT_MS)
+            overlayVisible = false
+        } else {
+            overlayVisible = true
+        }
+    }
+
+    LaunchedEffect(showOverlay, activeController, error) {
+        if (showOverlay && activeController != null && error == null) {
+            primaryControlFocusRequester.requestFocus()
+        } else {
+            surfaceFocusRequester.requestFocus()
+        }
+    }
+
+    val onOverlayInteraction = {
+        overlayVisible = true
+        overlayInteraction += 1
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .focusRequester(focusRequester)
+            .focusRequester(surfaceFocusRequester)
             .focusable()
             .onPreviewKeyEvent { event ->
                 handlePlaybackKey(
                     event = event.nativeKeyEvent,
                     controller = controller,
+                    onInteraction = onOverlayInteraction,
                     onFeedback = { controlFeedback = it },
                     onExit = onExit,
                 )
@@ -417,17 +451,25 @@ private fun QueuePlaybackScreen(
             )
         }
 
-        PlaybackOverlay(
-            title = title,
-            isPlaying = isPlaying,
-            positionMs = positionMs,
-            durationMs = durationMs,
-            queueIndex = queueIndex,
-            queueSize = queueSize,
-            warning = queueWarning,
-            controlFeedback = controlFeedback,
-            error = error,
-        )
+        if (showOverlay) {
+            PlaybackOverlay(
+                title = title,
+                isPlaying = isPlaying,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                queueIndex = queueIndex,
+                queueSize = queueSize,
+                warning = queueWarning,
+                controlFeedback = controlFeedback,
+                error = error,
+                controlsReady = activeController != null,
+                primaryControlFocusRequester = primaryControlFocusRequester,
+                onTogglePlayback = {
+                    onOverlayInteraction()
+                    togglePlayback(controller)
+                },
+            )
+        }
     }
 }
 
@@ -442,6 +484,9 @@ private fun PlaybackOverlay(
     warning: String?,
     controlFeedback: String?,
     error: String?,
+    controlsReady: Boolean,
+    primaryControlFocusRequester: FocusRequester,
+    onTogglePlayback: () -> Unit,
 ) {
     val status = when {
         error != null -> "Playback stopped"
@@ -545,6 +590,35 @@ private fun PlaybackOverlay(
                     color = Color.White,
                     fontSize = 22.sp,
                 )
+                if (controlsReady) {
+                    Button(
+                        onClick = onTogglePlayback,
+                        modifier = Modifier
+                            .padding(top = 14.dp)
+                            .focusRequester(primaryControlFocusRequester),
+                        colors = ButtonDefaults.colors(
+                            containerColor = Color(0xFF20384D),
+                            focusedContainerColor = Color(0xFFE9F7FF),
+                            contentColor = Color.White,
+                            focusedContentColor = Color(0xFF07121D),
+                        ),
+                        border = ButtonDefaults.border(
+                            focusedBorder = Border(
+                                border = androidx.compose.foundation.BorderStroke(
+                                    width = 3.dp,
+                                    color = Color(0xFF64C7FF),
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                        ),
+                    ) {
+                        Text(
+                            text = if (isPlaying) "Pause" else "Play",
+                            fontSize = 22.sp,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                        )
+                    }
+                }
                 Text(
                     text = "◀/▶ Seek     OK Play/Pause     ▲ Audio     ▼ Subtitles     BACK Exit",
                     color = Color(0xFFD2DFE9),
@@ -559,6 +633,7 @@ private fun PlaybackOverlay(
 private fun handlePlaybackKey(
     event: KeyEvent,
     controller: MediaController?,
+    onInteraction: () -> Unit,
     onFeedback: (String) -> Unit,
     onExit: () -> Unit,
 ): Boolean {
@@ -566,55 +641,31 @@ private fun handlePlaybackKey(
         return false
     }
 
-    return when (event.keyCode) {
-        KeyEvent.KEYCODE_DPAD_CENTER,
-        KeyEvent.KEYCODE_ENTER,
-        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-        -> {
-            if (event.repeatCount == 0) {
-                controller?.let {
-                    if (it.isPlaying) it.pause() else it.play()
-                }
-            }
-            true
-        }
-
-        KeyEvent.KEYCODE_DPAD_LEFT -> {
+    val decision = playbackKeyDecision(event.keyCode, event.repeatCount)
+    if (decision.revealOverlay) {
+        onInteraction()
+    }
+    when (decision.command) {
+        PlaybackRemoteCommand.TOGGLE_PLAY_PAUSE -> togglePlayback(controller)
+        PlaybackRemoteCommand.SEEK_BACKWARD ->
             controller?.seekTo((controller.currentPosition - SEEK_INCREMENT_MS).coerceAtLeast(0L))
-            true
-        }
-
-        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+        PlaybackRemoteCommand.SEEK_FORWARD ->
             controller?.seekTo(controller.currentPosition + SEEK_INCREMENT_MS)
-            true
-        }
-
-        KeyEvent.KEYCODE_DPAD_UP -> {
+        PlaybackRemoteCommand.NEXT_AUDIO_TRACK ->
             onFeedback(controller?.let(::selectNextAudioTrack) ?: "Audio is not ready.")
-            true
-        }
-
-        KeyEvent.KEYCODE_DPAD_DOWN -> {
+        PlaybackRemoteCommand.NEXT_SUBTITLE_TRACK ->
             onFeedback(controller?.let(::selectNextSubtitleTrack) ?: "Subtitles are not ready.")
-            true
-        }
+        PlaybackRemoteCommand.NEXT_MEDIA_ITEM -> controller?.seekToNextMediaItem()
+        PlaybackRemoteCommand.PREVIOUS_MEDIA_ITEM -> controller?.seekToPreviousMediaItem()
+        PlaybackRemoteCommand.EXIT -> onExit()
+        null -> Unit
+    }
+    return decision.consumed
+}
 
-        KeyEvent.KEYCODE_MEDIA_NEXT -> {
-            controller?.seekToNextMediaItem()
-            true
-        }
-
-        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-            controller?.seekToPreviousMediaItem()
-            true
-        }
-
-        KeyEvent.KEYCODE_BACK -> {
-            onExit()
-            true
-        }
-
-        else -> false
+private fun togglePlayback(controller: MediaController?) {
+    controller?.let {
+        if (it.isPlaying) it.pause() else it.play()
     }
 }
 
