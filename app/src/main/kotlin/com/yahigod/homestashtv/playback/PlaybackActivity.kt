@@ -62,9 +62,43 @@ import com.yahigod.homestashtv.ui.theme.HomeStashTvTheme
 import kotlinx.coroutines.delay
 
 class PlaybackActivity : ComponentActivity() {
+    private var playbackRequest by mutableStateOf<PlaybackRequest?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        playbackRequest = readPlaybackRequest(intent)
 
+        setContent {
+            playbackRequest?.let { request ->
+                HomeStashTvTheme {
+                    BackHandler(onBack = ::stopPlaybackAndFinish)
+                    QueuePlaybackScreen(
+                        commandId = request.commandId,
+                        profileId = request.profileId,
+                        serverUrl = request.serverUrl,
+                        apiKey = request.apiKey,
+                        sceneIds = request.sceneIds,
+                        requestedStartIndex = request.startIndex,
+                        requestedStartPositionMs = request.startPositionMs,
+                        continuePlayback = request.continuePlayback,
+                        loop = request.loop,
+                        reshuffle = request.reshuffle,
+                        reconnectOnly = request.reconnectOnly,
+                        configurationError = request.configurationError,
+                        onExit = ::stopPlaybackAndFinish,
+                    )
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        playbackRequest = readPlaybackRequest(intent)
+    }
+
+    private fun readPlaybackRequest(intent: Intent): PlaybackRequest {
         val reconnectOnly = intent.action == ACTION_RECONNECT
         val commandId = intent.getStringExtra(PlaybackContract.EXTRA_COMMAND_ID).orEmpty()
         val profileId = intent.getStringExtra(PlaybackContract.EXTRA_PROFILE_ID).orEmpty()
@@ -77,10 +111,6 @@ class PlaybackActivity : ComponentActivity() {
             ?.toList()
             ?: debugSceneId.takeIf { it.isNotBlank() }?.let(::listOf)
             ?: emptyList()
-        val serverUrl = profile?.serverUrl
-            ?: intent.getStringExtra(PlaybackContract.EXTRA_SERVER_URL).orEmpty()
-        val apiKey = profile?.let { repository.getCredential(it.id).orEmpty() }
-            ?: intent.getStringExtra(PlaybackContract.EXTRA_API_KEY).orEmpty()
         val configurationError = when {
             reconnectOnly -> null
             profileId.isNotBlank() && profile == null ->
@@ -89,38 +119,25 @@ class PlaybackActivity : ComponentActivity() {
             else -> null
         }
 
-        setContent {
-            HomeStashTvTheme {
-                BackHandler(onBack = ::stopPlaybackAndFinish)
-                QueuePlaybackScreen(
-                    commandId = commandId,
-                    profileId = profileId,
-                    serverUrl = serverUrl,
-                    apiKey = apiKey,
-                    sceneIds = sceneIds,
-                    requestedStartIndex = intent.getIntExtra(
-                        PlaybackContract.EXTRA_START_INDEX,
-                        0,
-                    ),
-                    requestedStartPositionMs = intent.getLongExtra(
-                        PlaybackContract.EXTRA_START_POSITION_MS,
-                        0L,
-                    ),
-                    continuePlayback = intent.getBooleanExtra(
-                        PlaybackContract.EXTRA_CONTINUE,
-                        true,
-                    ),
-                    loop = intent.getBooleanExtra(PlaybackContract.EXTRA_LOOP, false),
-                    reshuffle = intent.getBooleanExtra(
-                        PlaybackContract.EXTRA_RESHUFFLE,
-                        false,
-                    ),
-                    reconnectOnly = reconnectOnly,
-                    configurationError = configurationError,
-                    onExit = ::stopPlaybackAndFinish,
-                )
-            }
-        }
+        return PlaybackRequest(
+            reconnectOnly = reconnectOnly,
+            commandId = commandId,
+            profileId = profileId,
+            serverUrl = profile?.serverUrl
+                ?: intent.getStringExtra(PlaybackContract.EXTRA_SERVER_URL).orEmpty(),
+            apiKey = profile?.let { repository.getCredential(it.id).orEmpty() }
+                ?: intent.getStringExtra(PlaybackContract.EXTRA_API_KEY).orEmpty(),
+            sceneIds = sceneIds,
+            startIndex = intent.getIntExtra(PlaybackContract.EXTRA_START_INDEX, 0),
+            startPositionMs = intent.getLongExtra(
+                PlaybackContract.EXTRA_START_POSITION_MS,
+                0L,
+            ),
+            continuePlayback = intent.getBooleanExtra(PlaybackContract.EXTRA_CONTINUE, true),
+            loop = intent.getBooleanExtra(PlaybackContract.EXTRA_LOOP, false),
+            reshuffle = intent.getBooleanExtra(PlaybackContract.EXTRA_RESHUFFLE, false),
+            configurationError = configurationError,
+        )
     }
 
     private fun stopPlaybackAndFinish() {
@@ -137,6 +154,21 @@ class PlaybackActivity : ComponentActivity() {
             "com.yahigod.homestashtv.action.RECONNECT_PLAYBACK"
     }
 }
+
+private data class PlaybackRequest(
+    val reconnectOnly: Boolean,
+    val commandId: String,
+    val profileId: String,
+    val serverUrl: String,
+    val apiKey: String,
+    val sceneIds: List<String>,
+    val startIndex: Int,
+    val startPositionMs: Long,
+    val continuePlayback: Boolean,
+    val loop: Boolean,
+    val reshuffle: Boolean,
+    val configurationError: String?,
+)
 
 @Composable
 private fun QueuePlaybackScreen(
@@ -221,9 +253,12 @@ private fun QueuePlaybackScreen(
         reconnectOnly,
         configurationError,
     ) {
+        resolutionError = configurationError
         if (reconnectOnly || configurationError != null) {
             return@LaunchedEffect
         }
+        playbackError = null
+        queueWarning = null
         if (requestedStartIndex !in sceneIds.indices) {
             resolutionError = "The requested starting scene is outside the queue."
             reportResolutionFailure(context, commandId, "invalid_queue")

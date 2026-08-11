@@ -37,7 +37,8 @@
 
         <activity
             android:name=".playback.PlaybackActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:launchMode="singleTop" />
 
         <activity
             android:name=".profiles.ProfileSettingsActivity"

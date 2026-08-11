@@ -261,7 +261,7 @@ class AndroidReceiverCommandExecutor(
     override fun execute(command: PlayQueueCommand) {
         context.startActivity(
             Intent(context, PlaybackActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(playbackActivityLaunchFlags())
                 putExtra(
                     PlaybackContract.EXTRA_COMMAND_ID,
                     command.id,
@@ -280,6 +280,11 @@ class AndroidReceiverCommandExecutor(
         )
     }
 }
+
+internal fun playbackActivityLaunchFlags(): Int =
+    Intent.FLAG_ACTIVITY_NEW_TASK or
+        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+        Intent.FLAG_ACTIVITY_SINGLE_TOP
 
 internal object ReceiverRuntime {
     private var connection: ReceiverConnection? = null
