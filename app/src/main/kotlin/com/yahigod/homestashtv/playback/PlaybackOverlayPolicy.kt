@@ -22,8 +22,9 @@ internal data class PlaybackKeyDecision(
 internal fun playbackKeyDecision(
     keyCode: Int,
     repeatCount: Int,
-): PlaybackKeyDecision =
-    when (keyCode) {
+    action: Int = KeyEvent.ACTION_DOWN,
+): PlaybackKeyDecision {
+    val keyDecision = when (keyCode) {
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
@@ -46,6 +47,16 @@ internal fun playbackKeyDecision(
 
         else -> PlaybackKeyDecision(consumed = false)
     }
+
+    return when (action) {
+        KeyEvent.ACTION_DOWN -> keyDecision
+        KeyEvent.ACTION_UP -> keyDecision.copy(
+            revealOverlay = false,
+            command = null,
+        )
+        else -> PlaybackKeyDecision(consumed = false)
+    }
+}
 
 private fun playbackCommand(command: PlaybackRemoteCommand): PlaybackKeyDecision =
     PlaybackKeyDecision(
