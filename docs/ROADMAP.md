@@ -121,6 +121,12 @@ Exit criteria:
 
 ## 7. Release hardening
 
+Current status: supervised playback acceptance has passed on the Tesla target
+for representative 1080p and 4K media, remote controls, replacement playback,
+HOME/reopen, and Android TV Ambient Mode recovery. The signed-release
+foundation is tracked in issue #23; this checkpoint remains open until the
+production-signed install, upgrade, recovery, and tagged-release criteria pass.
+
 Deliverables:
 
 - Device test matrix
