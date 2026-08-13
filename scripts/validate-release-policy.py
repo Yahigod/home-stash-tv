@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -39,6 +40,14 @@ def properties(path: Path) -> dict[str, str]:
     return result
 
 
+def string_resources(path: Path) -> dict[str, str]:
+    root = ET.parse(path).getroot()
+    return {
+        item.attrib["name"]: "".join(item.itertext()).strip()
+        for item in root.findall("string")
+    }
+
+
 def validate(tag: str | None) -> None:
     release_properties = properties(ROOT / "gradle.properties")
     version_name = release_properties.get("homeStashTvVersionName", "")
@@ -66,6 +75,20 @@ def validate(tag: str | None) -> None:
         'signingConfig = signingConfigs.getByName("development")' in build,
         "Debug build is not bound to development signing.",
     )
+
+    production_strings = string_resources(
+        ROOT / "app" / "src" / "main" / "res" / "values" / "strings.xml",
+    )
+    debug_strings = string_resources(
+        ROOT / "app" / "src" / "debug" / "res" / "values" / "strings.xml",
+    )
+    for name in ("app_name", "receiver_default_name"):
+        require(production_strings.get(name), f"Production string {name} is missing.")
+        require(debug_strings.get(name), f"Debug string {name} is missing.")
+        require(
+            production_strings[name] != debug_strings[name],
+            f"Production and debug string {name} must be visibly distinct.",
+        )
 
     release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8",

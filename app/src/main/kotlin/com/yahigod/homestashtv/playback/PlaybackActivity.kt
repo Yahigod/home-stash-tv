@@ -94,8 +94,18 @@ class PlaybackActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        playbackRequest = readPlaybackRequest(intent)
+        val nextRequest = readPlaybackRequest(intent)
+        val currentRequest = playbackRequest
+        if (
+            shouldApplyPlaybackIntent(
+                currentCommandId = currentRequest?.commandId,
+                currentReconnectOnly = currentRequest?.reconnectOnly,
+                nextReconnectOnly = nextRequest.reconnectOnly,
+            )
+        ) {
+            setIntent(intent)
+            playbackRequest = nextRequest
+        }
     }
 
     private fun readPlaybackRequest(intent: Intent): PlaybackRequest {
@@ -357,7 +367,9 @@ private fun QueuePlaybackScreen(
             }
             isResolvingQueue = false
         }.onFailure {
+            it.rethrowIfCancellation()
             isResolvingQueue = false
+            title = null
             resolutionError = when (it) {
                 is QueueResolutionException,
                 is SceneResolutionException,
