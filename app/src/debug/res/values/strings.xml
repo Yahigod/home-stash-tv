@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Home Stash TV Debug</string>
+    <string name="receiver_default_name">Living Room TV Debug</string>
+</resources>

@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
+import com.yahigod.homestashtv.R
 import com.yahigod.homestashtv.ui.theme.HomeStashTvTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -69,10 +71,11 @@ internal fun BridgePairingScreen(
     onPaired: () -> Unit,
     client: BridgePairingClient = remember { BridgePairingClient() },
 ) {
+    val defaultDeviceName = stringResource(R.string.receiver_default_name)
     var savedPairing by remember { mutableStateOf(repository.getPairing()) }
     var bridgeUrl by remember { mutableStateOf(savedPairing?.bridgeUrl.orEmpty()) }
     var deviceName by remember {
-        mutableStateOf(savedPairing?.deviceName ?: "Living Room TV")
+        mutableStateOf(savedPairing?.deviceName ?: defaultDeviceName)
     }
     var pendingPairing by remember { mutableStateOf<PendingPairing?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -206,7 +209,7 @@ internal fun BridgePairingScreen(
             label = "Device name",
             value = deviceName,
             onValueChange = { deviceName = it },
-            placeholder = "Living Room TV",
+            placeholder = defaultDeviceName,
         )
         Spacer(modifier = Modifier.height(24.dp))
 
