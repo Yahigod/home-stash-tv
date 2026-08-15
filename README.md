@@ -3,13 +3,14 @@
 Native Android TV receiver for [Stash](https://github.com/stashapp/stash), designed to grow into a full TV client.
 
 > [!IMPORTANT]
-> The receiver MVP has passed supervised playback acceptance on the first Tesla
-> target, but the first production-signed release has not been published yet.
-> Library browsing is intentionally deferred.
+> The receiver MVP is published as [v0.1.0](https://github.com/Yahigod/home-stash-tv/releases/tag/v0.1.0)
+> after its production-signed release-candidate runtime passed supervised
+> end-to-end acceptance on the first Tesla target. Library browsing is
+> intentionally deferred.
 
 ## Receiver MVP
 
-The first usable version will:
+The v0.1.0 receiver:
 
 - run as a native Android TV application;
 - receive a scene or ordered queue from the Home Stash integration;

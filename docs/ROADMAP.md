@@ -121,11 +121,13 @@ Exit criteria:
 
 ## 7. Release hardening
 
-Current status: supervised playback acceptance has passed on the Tesla target
-for representative 1080p and 4K media, remote controls, replacement playback,
-HOME/reopen, and Android TV Ambient Mode recovery. The signed-release
-foundation is tracked in issue #23; this checkpoint remains open until the
-production-signed install, upgrade, recovery, and tagged-release criteria pass.
+Current status: complete. The production-signed release-candidate line passed
+the supervised clean-install, in-place upgrade, profile and pairing
+preservation, offline delivery, queue, remote-control, HOME/reopen, Android TV
+Ambient Mode, and TV-off wake/foreground acceptance gates on the Tesla target.
+The stable [v0.1.0 release](https://github.com/Yahigod/home-stash-tv/releases/tag/v0.1.0)
+contains the accepted rc.4 runtime unchanged except for release metadata and
+was published from reviewed main after exact-head and exact-main CI passed.
 
 Deliverables:
 
