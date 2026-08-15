@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackService
+import com.yahigod.homestashtv.playback.playbackActivityLaunchFlags
 
 /**
  * Debug-only entry point for real-device acceptance tests.
@@ -46,6 +47,7 @@ class PlaybackServiceProbeActivity : Activity() {
                 startActivity(
                     Intent(this, PlaybackActivity::class.java).apply {
                         action = PlaybackActivity.ACTION_RECONNECT
+                        addFlags(playbackActivityLaunchFlags())
                     },
                 )
                 finish()

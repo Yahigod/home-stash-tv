@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackContract
+import com.yahigod.homestashtv.playback.playbackActivityLaunchFlags
 
 /**
  * Debug-only ADB entry point for the single-scene playback proof.
@@ -18,6 +19,7 @@ class PlaybackTestLauncherActivity : Activity() {
 
         startActivity(
             Intent(this, PlaybackActivity::class.java).apply {
+                addFlags(playbackActivityLaunchFlags())
                 putExtra(
                     PlaybackContract.EXTRA_SERVER_URL,
                     intent.getStringExtra(PlaybackContract.EXTRA_SERVER_URL),

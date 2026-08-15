@@ -29,7 +29,8 @@ class PlaybackActivityManifestTest {
 
         assertNotNull(playback)
         assertNotNull(main)
-        assertEquals("true", playback!!.getAttributeNS(ANDROID_NAMESPACE, "turnScreenOn"))
+        assertEquals("singleTop", playback!!.getAttributeNS(ANDROID_NAMESPACE, "launchMode"))
+        assertEquals("true", playback.getAttributeNS(ANDROID_NAMESPACE, "turnScreenOn"))
         assertEquals("true", playback.getAttributeNS(ANDROID_NAMESPACE, "showWhenLocked"))
         assertEquals("", main!!.getAttributeNS(ANDROID_NAMESPACE, "turnScreenOn"))
         assertEquals("", main.getAttributeNS(ANDROID_NAMESPACE, "showWhenLocked"))

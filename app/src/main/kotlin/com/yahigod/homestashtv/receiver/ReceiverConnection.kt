@@ -7,6 +7,7 @@ import android.os.Looper
 import com.yahigod.homestashtv.BuildConfig
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackContract
+import com.yahigod.homestashtv.playback.playbackActivityLaunchFlags
 import com.yahigod.homestashtv.profiles.AndroidServerProfileRepository
 import com.yahigod.homestashtv.profiles.ServerProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -280,11 +281,6 @@ class AndroidReceiverCommandExecutor(
         )
     }
 }
-
-internal fun playbackActivityLaunchFlags(): Int =
-    Intent.FLAG_ACTIVITY_NEW_TASK or
-        Intent.FLAG_ACTIVITY_CLEAR_TOP or
-        Intent.FLAG_ACTIVITY_SINGLE_TOP
 
 internal object ReceiverRuntime {
     private var connection: ReceiverConnection? = null
