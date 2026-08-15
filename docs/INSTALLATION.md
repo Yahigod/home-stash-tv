@@ -24,7 +24,7 @@ When Android build tools are installed, verify the APK signature and compare
 the reported certificate SHA-256 digest with `signing-certificate.txt`:
 
 ```bash
-apksigner verify --verbose --print-certs home-stash-tv-v0.1.0-rc.1.apk
+apksigner verify --verbose --print-certs home-stash-tv-v0.1.0.apk
 ```
 
 Stop if either result differs. Do not substitute an APK from a workflow run,
@@ -36,7 +36,7 @@ Use the television's normal trusted APK installation flow, or select the exact
 ADB device explicitly:
 
 ```bash
-adb -s <tv-serial> install home-stash-tv-v0.1.0-rc.1.apk
+adb -s <tv-serial> install home-stash-tv-v0.1.0.apk
 ```
 
 Open **Home Stash TV** from the Android TV app launcher. A clean production
