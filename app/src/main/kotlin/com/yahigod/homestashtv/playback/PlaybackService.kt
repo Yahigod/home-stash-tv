@@ -58,7 +58,7 @@ class PlaybackService : MediaSessionService() {
                 return
             }
             persistCurrentState()
-            report(if (player.isPlaying) PlaybackStateValue.PLAYING else PlaybackStateValue.PAUSED)
+            reportCurrentPlayerState()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -66,13 +66,16 @@ class PlaybackService : MediaSessionService() {
                 return
             }
             persistCurrentState()
-            report(if (isPlaying) PlaybackStateValue.PLAYING else PlaybackStateValue.PAUSED)
+            reportCurrentPlayerState()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 onQueueEnded()
+                return
             }
+            persistCurrentState()
+            reportCurrentPlayerState()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -97,15 +100,29 @@ class PlaybackService : MediaSessionService() {
         intent: Intent?,
         flags: Int,
         startId: Int,
-    ): Int {
-        when (intent?.action) {
-            ACTION_LOAD_QUEUE -> loadQueue(intent)
-            ACTION_LOAD_TEST_SCENE -> loadTestScene(intent)
-            ACTION_STOP_PLAYBACK -> stopPlayback(manual = true)
-        }
+    ): Int =
+        when (playbackServiceStartRoute(intent?.action)) {
+            PlaybackServiceStartRoute.LOAD_QUEUE -> {
+                loadQueue(requireNotNull(intent))
+                START_STICKY
+            }
 
-        return super.onStartCommand(intent, flags, startId)
-    }
+            PlaybackServiceStartRoute.LOAD_TEST_SCENE -> {
+                loadTestScene(requireNotNull(intent))
+                START_STICKY
+            }
+
+            PlaybackServiceStartRoute.STOP_PLAYBACK -> {
+                stopPlayback(manual = true)
+                START_NOT_STICKY
+            }
+
+            // MediaSessionService treats an unrecognized first start intent as
+            // stale and stops itself. Delegate only Media3-owned actions so an
+            // app-owned cold-start queue cannot be terminated after loading.
+            PlaybackServiceStartRoute.MEDIA3 ->
+                super.onStartCommand(intent, flags, startId)
+        }
 
     override fun onGetSession(
         controllerInfo: MediaSession.ControllerInfo,
@@ -250,7 +267,7 @@ class PlaybackService : MediaSessionService() {
         }
         persistCurrentState()
         report(
-            if (shouldPlay) PlaybackStateValue.PLAYING else PlaybackStateValue.PAUSED,
+            if (shouldPlay) PlaybackStateValue.RESOLVING else PlaybackStateValue.PAUSED,
             force = true,
         )
     }
@@ -358,7 +375,7 @@ class PlaybackService : MediaSessionService() {
             shouldPlay = true,
         )
         report(
-            PlaybackStateValue.PLAYING,
+            PlaybackStateValue.RESOLVING,
             errorCode = "scene_skipped",
             force = true,
         )
@@ -405,6 +422,14 @@ class PlaybackService : MediaSessionService() {
                 wasPlaying = player.isPlaying,
             ),
         )
+    }
+
+    private fun reportCurrentPlayerState() {
+        playerPlaybackStateReport(
+            playbackState = player.playbackState,
+            playWhenReady = player.playWhenReady,
+            isPlaying = player.isPlaying,
+        )?.let(::report)
     }
 
     private fun report(
