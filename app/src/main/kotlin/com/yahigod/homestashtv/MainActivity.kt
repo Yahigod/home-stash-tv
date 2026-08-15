@@ -45,6 +45,7 @@ import androidx.tv.material3.Text
 import com.google.common.util.concurrent.ListenableFuture
 import com.yahigod.homestashtv.playback.PlaybackActivity
 import com.yahigod.homestashtv.playback.PlaybackService
+import com.yahigod.homestashtv.playback.playbackActivityLaunchFlags
 import com.yahigod.homestashtv.profiles.ProfileSettingsActivity
 import com.yahigod.homestashtv.receiver.BridgePairingActivity
 import com.yahigod.homestashtv.receiver.ReceiverRuntime
@@ -114,6 +115,7 @@ class MainActivity : ComponentActivity() {
                         startActivity(
                             Intent(this, PlaybackActivity::class.java).apply {
                                 action = PlaybackActivity.ACTION_RECONNECT
+                                addFlags(playbackActivityLaunchFlags())
                             },
                         )
                     }
