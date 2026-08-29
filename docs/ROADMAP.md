@@ -1,8 +1,10 @@
-# Receiver MVP Roadmap
+# Home Stash TV Roadmap
 
-The MVP is complete when a user can select a scene or queue in Home Stash, choose a paired Android TV, and have the native app reliably begin and continue playback without TV Bro.
+The receiver MVP is complete when a user can select a scene or queue in Home Stash, choose a paired Android TV, and have the native app reliably begin and continue playback without TV Bro.
 
 Each checkpoint must leave the system testable and usable. Work does not advance past a device-dependent checkpoint until it passes on the target Tesla TV.
+
+Stable `v0.1.0` completed the receiver MVP. Post-MVP work is tracked separately below and does not retroactively expand the completed MVP checkpoints.
 
 ## 1. Android TV foundation
 
@@ -146,17 +148,118 @@ Exit criteria:
 - CI and all required automated tests pass.
 - A tagged MVP release is published.
 
-## Deferred: full TV client
+# Post-MVP roadmap
 
-After the receiver MVP is stable, the same app may add:
+## 8. Complete playback experience — target v0.2.0
 
-- Subtitle discovery, selection, and translated-subtitle workflows
-- TV-native scene browsing
-- Search and saved filters
-- Performers and groups
-- Continue watching and history
-- Favorites
-- A richer server switcher
-- Recommendations and discovery
+Tracking issue: #37.
 
-These features must build on the receiver architecture and must not delay the MVP.
+The first post-MVP release keeps the accepted receiver architecture and Send-to-TV semantics while completing the playback experience around two deliberately separate overlays.
+
+### Navigational UI
+
+The navigational overlay is focusable and remote-driven. It appears on expected navigation or playback input and automatically hides after inactivity during uninterrupted playback.
+
+Deliverables:
+
+- visible playback timeline with current position and duration
+- play/pause
+- seek backward and forward
+- previous and next scene
+- current queue
+- clear current-scene indication
+- direct jump to another queue item
+- predictable Back/Exit behavior
+
+The navigational UI is for control and movement. It should remain compact enough that the video is still the primary content, and normal Send-to-TV commands must continue to start or replace playback exactly as accepted in `v0.1.0`.
+
+### Informational UI
+
+The informational overlay is a separate persistent scene-information mode controlled by the remote Info button.
+
+Behavior:
+
+- first Info press shows the overlay
+- the overlay remains visible indefinitely while playback continues
+- second Info press hides the overlay
+- the overlay is primarily passive/read-only rather than a second navigation surface
+- its background must remain transparent/translucent so the playing scene stays visible behind it; it must not become an opaque full-screen panel
+
+Available scene metadata may include:
+
+- scene title
+- linked movie/group title, when present
+- linked movie/group cover art, when available
+- performer names
+- performer thumbnails, when available
+- performer age at filming only
+- tags
+- studio
+- scene date
+
+Performer age means age on the scene date, never current age. Calculate and display it only when both the performer birth date and the scene date exist. If either value is missing, omit the age rather than estimate it or substitute current age.
+
+Presentation rules:
+
+- movie cover art stays compact and does not dominate the video
+- performer thumbnails stay compact and TV-readable
+- long performer/tag sets are capped or compacted, with an indicator such as `+N more` where useful
+- unavailable sections are hidden rather than represented by empty placeholders
+- both playback overlays preserve scene visibility wherever practical
+
+Exit criteria:
+
+- both overlays are fully legible and usable at normal TV viewing distance
+- the navigational overlay auto-hides and restores predictably with the Tesla remote
+- queue UI shows the active scene and supports previous/next and direct queue-item selection
+- Info toggles the informational overlay without stopping playback
+- the informational overlay stays visible until Info is pressed again
+- the informational overlay remains transparent/translucent enough that the scene is still visible
+- movie/group title and cover render when available and disappear cleanly when absent
+- performer thumbnails render when available
+- performer ages are shown only as age at filming and omitted when required dates are unavailable
+- tags, studio, and scene date render cleanly with compact overflow handling
+- existing single-scene, ordered-queue, filtered-queue, loop/reshuffle, resume, replacement, bridge acknowledgement, TV-off wake, and Ambient Mode behavior do not regress
+- representative 1080p and high-bitrate 4K playback pass physical Tesla TV checks
+
+## 9. TV-native scene browsing — target v0.3.0
+
+Tracking issue: #38.
+
+Planned capabilities:
+
+- Android TV scene grid
+- search
+- saved filters and useful filter controls
+- sort controls
+- richer server switching between configured Stash profiles
+- direct playback from the TV
+- select/build a queue from the TV
+- random/shuffle entry points where they fit cleanly
+
+Architecture intent: TV-native browsing queries the configured Stash server directly. The home-server bridge remains responsible for external Send-to-TV delivery, wake/launch orchestration, pairing, and command delivery rather than becoming the backend for the TV browsing interface.
+
+## 10. Rich library experience — target v0.4.0
+
+Tracking issue: #38.
+
+Planned capabilities:
+
+- performer browsing and performer-to-scenes views
+- movie/group browsing and group-to-scenes views
+- favorites
+- history
+- continue watching
+- richer scene, performer, and movie/group detail pages
+
+## Later candidates
+
+After the core library experience is solid, consider:
+
+- recommendations and discovery
+- subtitle discovery, selection, and translated-subtitle workflows
+- richer server administration
+- additional playback and library polish
+- broader platform support only if it becomes worthwhile
+
+All post-MVP features must build on the accepted receiver architecture rather than destabilize the completed `v0.1.0` Send-to-TV path.
